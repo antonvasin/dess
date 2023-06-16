@@ -1,8 +1,6 @@
 import { html, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
-import {
-  extract,
-  test,
-} from "https://deno.land/std@0.192.0/front_matter/any.ts";
+import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
+import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 
 /*
  * [ ]
@@ -26,7 +24,8 @@ import {
  * [ ] Copy to dist/ folder
  */
 
-const collectionDir = "./";
+const args = parse(Deno.args);
+const collectionDir = args.collectionDir || "./";
 
 const ignoreNames = [
   /readme/i,
