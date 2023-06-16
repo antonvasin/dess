@@ -47,9 +47,12 @@ interface Props {
   // deno-lint-ignore no-explicit-any
   children: any;
   title?: string;
+  routes?: string[];
 }
 
-function Layout({ children, title = "Anton Vasin" }: Props) {
+const addHtmlExt = (str: string) => str + ".html";
+
+function Layout({ children, title = "Anton Vasin", routes = [] }: Props) {
   return (
     <html>
       <body>
@@ -57,12 +60,11 @@ function Layout({ children, title = "Anton Vasin" }: Props) {
           {title && <h1>{title}</h1>}
           <nav>
             <ul>
-              <li>
-                <a href="/post1">post1</a>
-              </li>
-              <li>
-                <a href="/post2">post2</a>
-              </li>
+              {routes.map((route) => (
+                <li>
+                  <a href={addHtmlExt(route)}>{route}</a>
+                </li>
+              ))}
             </ul>
           </nav>
         </header>
@@ -86,32 +88,36 @@ async function collect(dir: string) {
   return posts;
 }
 
+interface PostFrontmatter {
+  layout?: string;
+}
+
 async function processMd(file: string, routes: string[]) {
   try {
     const md = await Deno.readTextFile(file);
-    let frontmatter: Record<string, unknown> | undefined;
+    let frontmatter: PostFrontmatter | undefined;
     let body = md;
 
     if (test(md)) {
-      frontmatter = extract(md);
-      body = frontmatter.body as string;
+      const parsedFm = extract(md);
+      frontmatter = parsedFm.attrs;
+      body = parsedFm.body as string;
     }
 
     const parsed = tokens(body);
     // console.log("Before rewrite");
     // console.table(parsed);
-    for (let i = 0; i < parsed.length; i++) {
-      const token = parsed[i];
+    for (const token of parsed) {
       if (token.type === "start" && token.tag === "link" && routes.includes(token.url)) {
         // TODO: use URL to preserve query string
         // TODO: Handle `.md` links
-        token.url = baseUrl + token.url + ".html";
+        token.url = addHtmlExt(baseUrl + token.url);
       }
     }
 
     // console.log("After rewrite");
     // console.table(parsed);
-    return { html: html(parsed), frontmatter };
+    return { html: html(parsed), options: frontmatter };
   } catch (err) {
     console.error(
       `Couldn't read file ${file}. Failed with:\n\n${err.message}`,
@@ -129,29 +135,27 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
   const routes = files.map((f) => "/" + f.name.replace(/\.md$/i, ""));
 
   for await (const file of files) {
-    const { html, frontmatter } = await processMd(
+    const { html, options } = await processMd(
       `${srcDir}/${file.name}`,
       routes,
     );
     let LayoutToUse = Layout;
 
-    if (frontmatter && frontmatter.attrs && typeof frontmatter.attrs === "object") {
-      // console.debug("Frontmatter for file ${file.name}:");
-      // console.table(frontmatter.attrs);
-      if ("layout" in frontmatter.attrs && typeof frontmatter.attrs.layout === "string") {
-        const layoutFile = frontmatter.attrs.layout;
-        console.log(`Found custom layout ${layoutFile}`);
+    if (options) {
+      if (options.layout) {
+        console.info(`Using custom layout ${options.layout} for ${file.name}`);
         try {
-          LayoutToUse = (await import(layoutFile)).default;
+          LayoutToUse = (await import(options.layout)).default;
         } catch (err) {
-          console.error(`Couldn't use template ${layoutFile}, using default Layout`);
+          console.error(`Couldn't use template ${options.layout}, using default Layout`);
         }
       }
     }
 
+    // FIXME: render without wrapper
     const rendered = renderSSR(
       () => (
-        <LayoutToUse>
+        <LayoutToUse routes={routes}>
           <main innerHTML={{ __dangerousHtml: html }} />
         </LayoutToUse>
       ),
