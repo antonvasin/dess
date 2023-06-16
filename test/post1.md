@@ -4,3 +4,5 @@ title: First post
 ---
 
 post number 1
+
+[next](/post2)

@@ -4,3 +4,5 @@ title: Second post
 ---
 
 post number 2
+
+[prev](/post1)

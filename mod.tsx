@@ -13,6 +13,7 @@ import { exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
  *     [x] parse markdown
  *     [x] read frontmatter
  *     [x] get html
+ *     [ ] replace links
  * [ ] Render static files
  *     [ ] apply layout
  *         [ ] read jsx file from frontmatter
@@ -22,8 +23,8 @@ import { exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
  *         [ ] read files from frontmatter
  *         [ ] add <script> to page
  *         [ ] copy asset to /dist
- *     [ ] render final html to file
- * [ ] Copy to dist/ folder
+ *     [x] render final html to file
+ * [x] Copy to dist/ folder
  */
 
 const args = parse(Deno.args);
@@ -37,9 +38,34 @@ const ignoreNames = [
   /changelog/i,
 ];
 
-async function collect() {
+interface Props {
+  // deno-lint-ignore no-explicit-any
+  children: any;
+}
+
+function Layout({ children }: Props) {
+  return (
+    <html>
+      <body>
+        <header>
+          <h1>Anton Vasin</h1>
+          <nav>
+            <ul>
+              <li>
+                <a href="/music">Music</a>
+              </li>
+            </ul>
+          </nav>
+        </header>
+        {children}
+      </body>
+    </html>
+  );
+}
+
+async function collect(dir: string) {
   const posts = [];
-  for await (const file of Deno.readDir(collectionDir)) {
+  for await (const file of Deno.readDir(dir)) {
     if (
       file.isFile && file.name.endsWith(".md") &&
       ignoreNames.every((r) => !r.test(file.name))
@@ -51,9 +77,9 @@ async function collect() {
   return posts;
 }
 
-async function processMd(file: Deno.DirEntry) {
+async function processMd(file: string) {
   try {
-    const md = await Deno.readTextFile(`${collectionDir}/${file.name}`);
+    const md = await Deno.readTextFile(file);
     let frontmatter: Record<string, unknown> | undefined;
     let body = md;
 
@@ -63,29 +89,29 @@ async function processMd(file: Deno.DirEntry) {
     }
 
     const parsed = tokens(body);
+    console.table(parsed);
     return { html: html(parsed), frontmatter };
   } catch (err) {
     console.error(
-      `Couldn't read file ${file.name}. Failed with:\n\n${err.message}`,
+      `Couldn't read file ${file}. Failed with:\n\n${err.message}`,
     );
     throw (err);
   }
 }
 
-async function createHTML() {
+export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) {
   if (await exists(outDir)) {
     await Deno.remove(outDir, { recursive: true });
   }
   await Deno.mkdir(outDir);
-  for await (const file of await collect()) {
-    const { html, frontmatter } = await processMd(file);
+  for await (const file of await collect(srcDir)) {
+    const { html, frontmatter } = await processMd(`${srcDir}/${file.name}`);
 
     if (frontmatter) {
-      console.debug("Frontmatter for file ${file.name}:");
-      console.table(frontmatter.attrs);
+      // console.debug("Frontmatter for file ${file.name}:");
+      // console.table(frontmatter.attrs);
     }
 
-    const Layout = (await import("./test/layout.tsx")).default;
     const rendered = renderSSR(
       () => (
         <Layout>
@@ -94,8 +120,6 @@ async function createHTML() {
       ),
     );
 
-    Deno.writeTextFile(`${outDir}/${file.name.replace(/\.md$/, ".html")}`, rendered);
+    Deno.writeTextFile(`${out}/${file.name.replace(/\.md$/, ".html")}`, rendered);
   }
 }
-
-await createHTML();
