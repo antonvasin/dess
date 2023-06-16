@@ -17,6 +17,7 @@ import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
  *         [ ] handle nested links
  *     [ ] create url-safe anchors for headers
  *     [ ] return list of headers for a page
+ *     [ ] return meta from frontmatter
  * [ ] Render static files
  *     [ ] apply layout
  *         [ ] read jsx file from frontmatter
@@ -128,17 +129,27 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
       `${srcDir}/${file.name}`,
       routes,
     );
+    let LayoutToUse = Layout;
 
-    if (frontmatter) {
+    if (frontmatter && frontmatter.attrs && typeof frontmatter.attrs === "object") {
       // console.debug("Frontmatter for file ${file.name}:");
       // console.table(frontmatter.attrs);
+      if ("layout" in frontmatter.attrs && typeof frontmatter.attrs.layout === "string") {
+        const layoutFile = frontmatter.attrs.layout;
+        console.log(`Found custom layout ${layoutFile}`);
+        try {
+          LayoutToUse = (await import(layoutFile)).default;
+        } catch (err) {
+          console.error(`Couldn't use template ${layoutFile}, using default Layout`);
+        }
+      }
     }
 
     const rendered = renderSSR(
       () => (
-        <Layout>
+        <LayoutToUse>
           <main innerHTML={{ __dangerousHtml: html }} />
-        </Layout>
+        </LayoutToUse>
       ),
     );
 
