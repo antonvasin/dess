@@ -13,7 +13,8 @@ import { exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
  *     [x] parse markdown
  *     [x] read frontmatter
  *     [x] get html
- *     [ ] replace links
+ *     [x] replace links
+ *         [ ] prepend with absolute path
  * [ ] Render static files
  *     [ ] apply layout
  *         [ ] read jsx file from frontmatter
@@ -30,6 +31,7 @@ import { exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
 const args = parse(Deno.args);
 const collectionDir = args.collectionDir || "./";
 const outDir = args.outDir || "./dist";
+const baseUrl = args.baseUrl || "http://localhost:3000";
 
 const ignoreNames = [
   /readme/i,
@@ -77,7 +79,7 @@ async function collect(dir: string) {
   return posts;
 }
 
-async function processMd(file: string) {
+async function processMd(file: string, pages: string[]) {
   try {
     const md = await Deno.readTextFile(file);
     let frontmatter: Record<string, unknown> | undefined;
@@ -89,6 +91,17 @@ async function processMd(file: string) {
     }
 
     const parsed = tokens(body);
+    console.log("Before rewrite");
+    console.dir(pages);
+    console.table(parsed);
+    for (let i = 0; i < parsed.length; i++) {
+      const token = parsed[i];
+      if (token.type === "start" && token.tag === "link" && pages.includes(token.url)) {
+        token.url = baseUrl + token.url + ".html";
+      }
+    }
+
+    console.log("After rewrite");
     console.table(parsed);
     return { html: html(parsed), frontmatter };
   } catch (err) {
@@ -104,8 +117,12 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
     await Deno.remove(outDir, { recursive: true });
   }
   await Deno.mkdir(outDir);
-  for await (const file of await collect(srcDir)) {
-    const { html, frontmatter } = await processMd(`${srcDir}/${file.name}`);
+  // for await (const file of await collect(srcDir)) {
+  (await collect(srcDir)).forEach(async (file, _i, ary) => {
+    const { html, frontmatter } = await processMd(
+      `${srcDir}/${file.name}`,
+      ary.map((f) => "/" + f.name.replace(/\.md$/i, "")),
+    );
 
     if (frontmatter) {
       // console.debug("Frontmatter for file ${file.name}:");
@@ -121,5 +138,5 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
     );
 
     Deno.writeTextFile(`${out}/${file.name.replace(/\.md$/, ".html")}`, rendered);
-  }
+  });
 }
