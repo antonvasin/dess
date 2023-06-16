@@ -1,11 +1,15 @@
 {
   "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
   "tasks": {
-    "test": "deno run --allow-read=. mod.ts"
+    "test": "deno run --allow-read=. mod.tsx"
   },
   "fmt": {
     "options": {
       "lineWidth": 100
     }
+  },
+  "compilerOptions": {
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment"
   }
 }
