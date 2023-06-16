@@ -2,7 +2,8 @@
   "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
   "tasks": {
     "test": "deno run --allow-read=. --allow-write=. test_build.ts",
-    "serve": "deno run --allow-read=./dist --allow-net https://deno.land/std/http/file_server.ts -p 3000 ./dist"
+    "serve": "deno run --allow-read=./dist --allow-net https://deno.land/std/http/file_server.ts -p 3000 ./dist",
+    "dev": "deno run -A --watch dev.ts"
   },
   "fmt": {
     "options": {

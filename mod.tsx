@@ -46,18 +46,22 @@ const ignoreNames = [
 interface Props {
   // deno-lint-ignore no-explicit-any
   children: any;
+  title?: string;
 }
 
-function Layout({ children }: Props) {
+function Layout({ children, title = "Anton Vasin" }: Props) {
   return (
     <html>
       <body>
         <header>
-          <h1>Anton Vasin</h1>
+          {title && <h1>{title}</h1>}
           <nav>
             <ul>
               <li>
-                <a href="/music">Music</a>
+                <a href="/post1">post1</a>
+              </li>
+              <li>
+                <a href="/post2">post2</a>
               </li>
             </ul>
           </nav>
