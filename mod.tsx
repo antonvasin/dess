@@ -21,7 +21,7 @@ import { insertAt } from "../orchard/string.ts";
  *         [x] preserve query strings and headers
  *     [x] create url-safe anchors for headers
  *     [x] return list of headers for a page
- *     [ ] return meta from frontmatter
+ *     [x] return meta from frontmatter
  * [ ] Render static files
  *     [ ] apply layout
  *         [x] read jsx file from frontmatter
@@ -55,6 +55,7 @@ export interface LayoutProps {
   title?: string;
   routes?: string[];
   headings?: ContentHeading[];
+  frontmatter?: PostFrontmatter;
 }
 
 const addExt = (str: string, ext = ".html") =>
@@ -94,7 +95,7 @@ export async function collect(dir: string) {
   return posts;
 }
 
-interface PostFrontmatter {
+interface PostFrontmatter extends Record<string, unknown> {
   layout?: string;
   title?: string;
   slug?: string;
@@ -108,7 +109,7 @@ interface ContentHeading {
 
 interface ContentEntry {
   html: string;
-  options?: PostFrontmatter;
+  frontmatter?: PostFrontmatter;
   headings?: ContentHeading[];
 }
 
@@ -176,7 +177,7 @@ export function processMd(
   // console.log("After rewrite");
   // console.table(parsed);
   // console.dir(headings);
-  return { html: html(parsed), options: frontmatter, headings };
+  return { html: html(parsed), frontmatter, headings };
 }
 
 export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) {
@@ -194,25 +195,27 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
       );
       throw (err);
     }
-    const { html, options } = processMd(
+    const { html, frontmatter } = processMd(
       content,
       file,
       routes,
     );
     let LayoutToUse = Layout;
 
-    if (options) {
-      if (options.layout) {
-        console.info(`Using custom layout ${options.layout} for ${file}`);
+    if (frontmatter) {
+      if (frontmatter.layout) {
+        console.info(`Using custom layout ${frontmatter.layout} for ${file}`);
         try {
-          LayoutToUse = (await import(options.layout)).default;
+          LayoutToUse = (await import(frontmatter.layout)).default;
         } catch (err) {
-          console.error(`Couldn't use template ${options.layout}, using default Layout`);
+          console.error(`Couldn't use template ${frontmatter.layout}, using default Layout`);
         }
       }
     }
 
-    const rendered = renderSSR(() => <LayoutToUse routes={routes} html={html} />);
+    const rendered = renderSSR(() => (
+      <LayoutToUse routes={routes} html={html} frontmatter={frontmatter} />
+    ));
 
     const outDir = `${out}/${dirname(file.replace(srcDir, ""))}`;
     await ensureDir(outDir);
