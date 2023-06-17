@@ -1,5 +1,6 @@
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
-import { exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
+import { emptyDir, ensureDir, exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
+import { dirname } from "https://deno.land/std@0.192.0/path/mod.ts";
 
 import { html, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
@@ -14,7 +15,7 @@ import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
  *     [x] replace links
  *         [x] prepend with absolute path
  *         [ ] handle .md links
- *         [ ] handle nested links
+ *         [x] handle nested links
  *     [ ] create url-safe anchors for headers
  *     [ ] return list of headers for a page
  *     [ ] return meta from frontmatter
@@ -74,17 +75,20 @@ function Layout({ children, title = "Anton Vasin", routes = [] }: Props) {
   );
 }
 
-async function collect(dir: string) {
+async function collect(dir: string): Promise<string[]> {
   const posts = [];
   for await (const file of Deno.readDir(dir)) {
     if (
       file.isFile && file.name.endsWith(".md") &&
       ignoreNames.every((r) => !r.test(file.name))
     ) {
-      posts.push(file);
+      posts.push(file.name);
+    } else if (file.isDirectory) {
+      posts.push(...(await collect(`${dir}/${file.name}`)).map((f) => `${file.name}/${f}`));
     }
   }
 
+  console.dir(posts);
   return posts;
 }
 
@@ -127,23 +131,20 @@ async function processMd(file: string, routes: string[]) {
 }
 
 export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) {
-  if (await exists(outDir)) {
-    await Deno.remove(outDir, { recursive: true });
-  }
-  await Deno.mkdir(outDir);
+  await emptyDir(out);
   const files = await collect(srcDir);
-  const routes = files.map((f) => "/" + f.name.replace(/\.md$/i, ""));
+  const routes = files.map((f) => "/" + f.replace(/\.md$/i, ""));
 
   for await (const file of files) {
     const { html, options } = await processMd(
-      `${srcDir}/${file.name}`,
+      `${srcDir}/${file}`,
       routes,
     );
     let LayoutToUse = Layout;
 
     if (options) {
       if (options.layout) {
-        console.info(`Using custom layout ${options.layout} for ${file.name}`);
+        console.info(`Using custom layout ${options.layout} for ${file}`);
         try {
           LayoutToUse = (await import(options.layout)).default;
         } catch (err) {
@@ -161,6 +162,9 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
       ),
     );
 
-    Deno.writeTextFile(`${out}/${file.name.replace(/\.md$/, ".html")}`, rendered);
+    const outDir = `${out}/${dirname(file.replace(srcDir, ""))}`;
+    await ensureDir(outDir);
+
+    Deno.writeTextFile(`${out}/${file.replace(/\.md$/, ".html")}`, rendered);
   }
 }

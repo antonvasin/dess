@@ -6,4 +6,4 @@ layout: './test/test_layout.tsx'
 
 post number 2
 
-[prev](/post1)
+[prev](/blog/post1)

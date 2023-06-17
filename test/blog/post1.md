@@ -5,4 +5,4 @@ title: First post
 
 post number 1
 
-[next](/post2)
+[next](/blog/post2)
