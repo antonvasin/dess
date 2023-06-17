@@ -1,11 +1,12 @@
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
 import { dirname, relative } from "https://deno.land/std@0.192.0/path/mod.ts";
+import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
 
 import { html, Token, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
 import { slug } from "https://deno.land/x/slug@v1.1.0/mod.ts";
-import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
 import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
+import { insertAt } from "../orchard/string.ts";
 
 /*
  * [x] Collect md files
@@ -17,7 +18,7 @@ import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
  *         [x] prepend with absolute path
  *         [ ] handle .md links
  *         [x] handle nested links
- *         [ ] preserve query strings
+ *         [x] preserve query strings and headers
  *     [x] create url-safe anchors for headers
  *     [x] return list of headers for a page
  *     [ ] return meta from frontmatter
@@ -34,10 +35,11 @@ import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
  * [x] Copy to dist/ folder
  */
 
-const args = parse(Deno.args);
-const collectionDir = args.collectionDir || "./";
-const outDir = args.outDir || "./dist";
-const baseUrl = args.baseUrl || "http://localhost:3000";
+const {
+  collectionDir = "./",
+  outDir = "./dist",
+  baseUrl = "http://localhost:3000",
+} = parse(Deno.args);
 
 const extensions = [".md"];
 
@@ -55,7 +57,12 @@ export interface LayoutProps {
   headings?: ContentHeading[];
 }
 
-const addHtmlExt = (str: string) => str + ".html";
+const addExt = (str: string, ext = ".html") =>
+  str.includes("#")
+    ? insertAt(str, str.indexOf("#"), ext)
+    : str.includes("?")
+    ? insertAt(str, str.indexOf("?"), ext)
+    : str + ext;
 
 function Layout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
   return (
@@ -67,7 +74,7 @@ function Layout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
             <ul>
               {routes.map((route) => (
                 <li>
-                  <a href={addHtmlExt(route)}>{route}</a>
+                  <a href={addExt(route)}>{route}</a>
                 </li>
               ))}
             </ul>
@@ -128,7 +135,7 @@ export function processMd(
   parsed.forEach((token, i, ary) => {
     // Rewrite links
     if (token.type === "start" && token.tag === "link" && routes.includes(token.url)) {
-      token.url = addHtmlExt(baseUrl + token.url);
+      token.url = addExt(baseUrl + token.url);
     }
 
     // Rewrite headings
