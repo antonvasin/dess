@@ -104,69 +104,72 @@ interface ContentEntry {
   headings?: ContentHeading[];
 }
 
-export async function processMd(file: string, routes: string[]): Promise<ContentEntry> {
-  try {
-    const md = await Deno.readTextFile(file);
-    let frontmatter: PostFrontmatter | undefined;
-    let body = md;
+export async function processMd(
+  file: string,
+  page: string,
+  routes: string[],
+): Promise<ContentEntry> {
+  const md = file;
+  let frontmatter: PostFrontmatter | undefined;
+  let body = md;
 
-    if (test(md)) {
-      const parsedFm = extract(md);
-      frontmatter = parsedFm.attrs;
-      body = parsedFm.body as string;
+  if (test(md)) {
+    const parsedFm = extract(md);
+    frontmatter = parsedFm.attrs;
+    body = parsedFm.body as string;
+  }
+
+  const parsed = tokens(body);
+  const headings: ContentHeading[] = [];
+  console.log("Before rewrite", page);
+  console.table(parsed);
+
+  parsed.forEach((token, i, ary) => {
+    // Rewrite links
+    if (token.type === "start" && token.tag === "link" && routes.includes(token.url)) {
+      // TODO: use URL to preserve query string
+      // TODO: Handle `.md` links
+      token.url = addHtmlExt(baseUrl + token.url);
     }
 
-    const parsed = tokens(body);
-    const headings: ContentHeading[] = [];
-    console.log("Before rewrite", file);
-    console.table(parsed);
-
-    parsed.forEach((token, i, ary) => {
-      // Rewrite links
-      if (token.type === "start" && token.tag === "link" && routes.includes(token.url)) {
-        // TODO: use URL to preserve query string
-        // TODO: Handle `.md` links
-        token.url = addHtmlExt(baseUrl + token.url);
-      }
-
-      // Rewrite headings
-      if (token.type === "start" && token.tag === "heading") {
-        let headingText = "";
-        for (const token of parsed.slice(i)) {
-          if (token.type === "text") {
-            headingText += token.content;
-          }
-          if (token.type === "end" && token.tag === "heading") {
-            break;
-          }
+    // Rewrite headings
+    if (token.type === "start" && token.tag === "heading") {
+      let headingText = "";
+      for (const token of parsed.slice(i)) {
+        if (token.type === "text") {
+          headingText += token.content;
         }
-        const slugText = slug(headingText);
-
-        const endIdx = parsed.slice(i).findIndex((token) =>
-          token.type === "end" && token.tag === "heading"
-        );
-        const headerContent = html(parsed.slice(i + 1, endIdx + i));
-        const htmlHeader: Token = {
-          type: "html",
-          content: `<h${token.level} id="${slugText}">${headerContent}</h${token.level}>`,
-        };
-
-        ary.splice(i, endIdx + 1, htmlHeader);
-
-        headings.push({ text: headingText, slug: slugText });
+        if (token.type === "end" && token.tag === "heading") {
+          break;
+        }
       }
-    });
+      const slugText = slug(headingText);
 
-    console.log("After rewrite");
-    console.table(parsed);
-    console.dir(headings);
-    return { html: html(parsed), options: frontmatter, headings };
-  } catch (err) {
-    console.error(
-      `Couldn't read file ${file}. Failed with:\n\n${err.message}`,
-    );
-    throw (err);
-  }
+      const endIdx = parsed.slice(i).findIndex((token) =>
+        token.type === "end" && token.tag === "heading"
+      );
+      const headerContent = html(parsed.slice(i + 1, endIdx + i));
+      console.log("Page path is", page);
+
+      const headerAnchorLink = `<a href="/${
+        page.replace(/\.md$/, ".html")
+      }#${slugText}">[link]</a>`;
+      const htmlHeader: Token = {
+        type: "html",
+        content:
+          `<h${token.level} id="${slugText}">${headerContent} ${headerAnchorLink}</h${token.level}>`,
+      };
+
+      ary.splice(i, endIdx + 1, htmlHeader);
+
+      headings.push({ text: headingText, slug: slugText });
+    }
+  });
+
+  console.log("After rewrite");
+  console.table(parsed);
+  console.dir(headings);
+  return { html: html(parsed), options: frontmatter, headings };
 }
 
 export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) {
@@ -175,8 +178,18 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
   const routes = files.map((f) => "/" + f.replace(/\.md$/i, ""));
 
   for await (const file of files) {
+    let content: string;
+    try {
+      content = await Deno.readTextFile(`${srcDir}/${file}`);
+    } catch (err) {
+      console.error(
+        `Couldn't read file ${file}. Failed with:\n\n${err.message}`,
+      );
+      throw (err);
+    }
     const { html, options } = await processMd(
-      `${srcDir}/${file}`,
+      content,
+      file,
       routes,
     );
     let LayoutToUse = Layout;
