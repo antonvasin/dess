@@ -1,11 +1,12 @@
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
+import { LayoutProps } from "../mod.tsx";
 
-export default function Layout({ children }: { children: any }) {
+export default function Layout({ html }: LayoutProps) {
   return (
     <html>
       <body>
         This is a test layout
-        {children}
+        <div innerHTML={{ __dangerousHtml: html }} />
       </body>
     </html>
   );

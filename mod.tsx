@@ -46,16 +46,15 @@ const ignoreNames = [
   /changelog/i,
 ];
 
-interface Props {
-  // deno-lint-ignore no-explicit-any
-  children: any;
+export interface LayoutProps {
+  html: string;
   title?: string;
   routes?: string[];
 }
 
 const addHtmlExt = (str: string) => str + ".html";
 
-function Layout({ children, title = "Blog Title", routes = [] }: Props) {
+function Layout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
   return (
     <html>
       <body>
@@ -71,7 +70,7 @@ function Layout({ children, title = "Blog Title", routes = [] }: Props) {
             </ul>
           </nav>
         </header>
-        {children}
+        <main innerHTML={{ __dangerousHtml: html }} />
       </body>
     </html>
   );
@@ -146,14 +145,7 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
       }
     }
 
-    // FIXME: render without wrapper
-    const rendered = renderSSR(
-      () => (
-        <LayoutToUse routes={routes}>
-          <main innerHTML={{ __dangerousHtml: html }} />
-        </LayoutToUse>
-      ),
-    );
+    const rendered = renderSSR(() => <LayoutToUse routes={routes} html={html} />);
 
     const outDir = `${out}/${dirname(file.replace(srcDir, ""))}`;
     await ensureDir(outDir);
