@@ -17,8 +17,9 @@ import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
  *         [x] prepend with absolute path
  *         [ ] handle .md links
  *         [x] handle nested links
- *     [ ] create url-safe anchors for headers
- *     [ ] return list of headers for a page
+ *         [ ] preserve query strings
+ *     [x] create url-safe anchors for headers
+ *     [x] return list of headers for a page
  *     [ ] return meta from frontmatter
  * [ ] Render static files
  *     [ ] apply layout
@@ -104,31 +105,29 @@ interface ContentEntry {
   headings?: ContentHeading[];
 }
 
-export async function processMd(
-  file: string,
+export function processMd(
+  input: string,
   page: string,
   routes: string[],
-): Promise<ContentEntry> {
-  const md = file;
+): ContentEntry {
   let frontmatter: PostFrontmatter | undefined;
-  let body = md;
+  let markdown = input;
 
-  if (test(md)) {
-    const parsedFm = extract(md);
-    frontmatter = parsedFm.attrs;
-    body = parsedFm.body as string;
+  if (test(input)) {
+    const { attrs, body } = extract(input);
+    frontmatter = attrs;
+    markdown = body;
   }
 
-  const parsed = tokens(body);
+  const parsed = tokens(markdown);
   const headings: ContentHeading[] = [];
-  console.log("Before rewrite", page);
-  console.table(parsed);
+
+  // console.log("Before rewrite", page);
+  // console.table(parsed);
 
   parsed.forEach((token, i, ary) => {
     // Rewrite links
     if (token.type === "start" && token.tag === "link" && routes.includes(token.url)) {
-      // TODO: use URL to preserve query string
-      // TODO: Handle `.md` links
       token.url = addHtmlExt(baseUrl + token.url);
     }
 
@@ -143,32 +142,33 @@ export async function processMd(
           break;
         }
       }
-      const slugText = slug(headingText);
 
-      const endIdx = parsed.slice(i).findIndex((token) =>
+      const slugText = slug(headingText, { remove: /[\s$*_+~.()'"!:@]+/g });
+
+      const tagEndIdx = parsed.slice(i).findIndex((token) =>
         token.type === "end" && token.tag === "heading"
       );
-      const headerContent = html(parsed.slice(i + 1, endIdx + i));
-      console.log("Page path is", page);
+      const headerContent = html(parsed.slice(i + 1, tagEndIdx + i));
 
       const headerAnchorLink = `<a href="/${
         page.replace(/\.md$/, ".html")
       }#${slugText}">[link]</a>`;
+
       const htmlHeader: Token = {
         type: "html",
         content:
           `<h${token.level} id="${slugText}">${headerContent} ${headerAnchorLink}</h${token.level}>`,
       };
 
-      ary.splice(i, endIdx + 1, htmlHeader);
+      ary.splice(i, tagEndIdx + 1, htmlHeader);
 
       headings.push({ text: headingText, slug: slugText });
     }
   });
 
-  console.log("After rewrite");
-  console.table(parsed);
-  console.dir(headings);
+  // console.log("After rewrite");
+  // console.table(parsed);
+  // console.dir(headings);
   return { html: html(parsed), options: frontmatter, headings };
 }
 
@@ -187,7 +187,7 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
       );
       throw (err);
     }
-    const { html, options } = await processMd(
+    const { html, options } = processMd(
       content,
       file,
       routes,
