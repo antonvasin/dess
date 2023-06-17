@@ -1,6 +1,6 @@
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
-import { emptyDir, ensureDir, exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
-import { dirname } from "https://deno.land/std@0.192.0/path/mod.ts";
+import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
+import { dirname, relative } from "https://deno.land/std@0.192.0/path/mod.ts";
 
 import { html, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
@@ -37,6 +37,8 @@ const collectionDir = args.collectionDir || "./";
 const outDir = args.outDir || "./dist";
 const baseUrl = args.baseUrl || "http://localhost:3000";
 
+const extensions = [".md"];
+
 const ignoreNames = [
   /readme/i,
   /license/i,
@@ -53,7 +55,7 @@ interface Props {
 
 const addHtmlExt = (str: string) => str + ".html";
 
-function Layout({ children, title = "Anton Vasin", routes = [] }: Props) {
+function Layout({ children, title = "Blog Title", routes = [] }: Props) {
   return (
     <html>
       <body>
@@ -75,20 +77,11 @@ function Layout({ children, title = "Anton Vasin", routes = [] }: Props) {
   );
 }
 
-async function collect(dir: string): Promise<string[]> {
+export async function collect(dir: string) {
   const posts = [];
-  for await (const file of Deno.readDir(dir)) {
-    if (
-      file.isFile && file.name.endsWith(".md") &&
-      ignoreNames.every((r) => !r.test(file.name))
-    ) {
-      posts.push(file.name);
-    } else if (file.isDirectory) {
-      posts.push(...(await collect(`${dir}/${file.name}`)).map((f) => `${file.name}/${f}`));
-    }
+  for await (const file of walk(dir, { exts: extensions, skip: ignoreNames })) {
+    posts.push(relative(dir, file.path));
   }
-
-  console.dir(posts);
   return posts;
 }
 
@@ -96,7 +89,7 @@ interface PostFrontmatter {
   layout?: string;
 }
 
-async function processMd(file: string, routes: string[]) {
+export async function processMd(file: string, routes: string[]) {
   try {
     const md = await Deno.readTextFile(file);
     let frontmatter: PostFrontmatter | undefined;
