@@ -2,7 +2,8 @@ import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
 import { dirname, relative } from "https://deno.land/std@0.192.0/path/mod.ts";
 
-import { html, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
+import { html, Token, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
+import { slug } from "https://deno.land/x/slug@v1.1.0/mod.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
 import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 
@@ -21,7 +22,7 @@ import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
  *     [ ] return meta from frontmatter
  * [ ] Render static files
  *     [ ] apply layout
- *         [ ] read jsx file from frontmatter
+ *         [x] read jsx file from frontmatter
  *         [x] render html
  *         [x] insert content into html
  *     [ ] add asset scripts
@@ -50,6 +51,7 @@ export interface LayoutProps {
   html: string;
   title?: string;
   routes?: string[];
+  headings?: ContentHeading[];
 }
 
 const addHtmlExt = (str: string) => str + ".html";
@@ -86,9 +88,23 @@ export async function collect(dir: string) {
 
 interface PostFrontmatter {
   layout?: string;
+  title?: string;
+  slug?: string;
+  date?: string;
 }
 
-export async function processMd(file: string, routes: string[]) {
+interface ContentHeading {
+  slug: string;
+  text: string;
+}
+
+interface ContentEntry {
+  html: string;
+  options?: PostFrontmatter;
+  headings?: ContentHeading[];
+}
+
+export async function processMd(file: string, routes: string[]): Promise<ContentEntry> {
   try {
     const md = await Deno.readTextFile(file);
     let frontmatter: PostFrontmatter | undefined;
@@ -101,19 +117,50 @@ export async function processMd(file: string, routes: string[]) {
     }
 
     const parsed = tokens(body);
-    // console.log("Before rewrite");
-    // console.table(parsed);
-    for (const token of parsed) {
+    const headings: ContentHeading[] = [];
+    console.log("Before rewrite", file);
+    console.table(parsed);
+
+    parsed.forEach((token, i, ary) => {
+      // Rewrite links
       if (token.type === "start" && token.tag === "link" && routes.includes(token.url)) {
         // TODO: use URL to preserve query string
         // TODO: Handle `.md` links
         token.url = addHtmlExt(baseUrl + token.url);
       }
-    }
 
-    // console.log("After rewrite");
-    // console.table(parsed);
-    return { html: html(parsed), options: frontmatter };
+      // Rewrite headings
+      if (token.type === "start" && token.tag === "heading") {
+        let headingText = "";
+        for (const token of parsed.slice(i)) {
+          if (token.type === "text") {
+            headingText += token.content;
+          }
+          if (token.type === "end" && token.tag === "heading") {
+            break;
+          }
+        }
+        const slugText = slug(headingText);
+
+        const endIdx = parsed.slice(i).findIndex((token) =>
+          token.type === "end" && token.tag === "heading"
+        );
+        const headerContent = html(parsed.slice(i + 1, endIdx + i));
+        const htmlHeader: Token = {
+          type: "html",
+          content: `<h${token.level} id="${slugText}">${headerContent}</h${token.level}>`,
+        };
+
+        ary.splice(i, endIdx + 1, htmlHeader);
+
+        headings.push({ text: headingText, slug: slugText });
+      }
+    });
+
+    console.log("After rewrite");
+    console.table(parsed);
+    console.dir(headings);
+    return { html: html(parsed), options: frontmatter, headings };
   } catch (err) {
     console.error(
       `Couldn't read file ${file}. Failed with:\n\n${err.message}`,
