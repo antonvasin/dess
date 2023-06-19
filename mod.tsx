@@ -7,9 +7,11 @@ import { html, Token, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/m
 import { slug } from "https://deno.land/x/slug@v1.1.0/mod.ts";
 import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { insertAt } from "../orchard/string.ts";
+import { bold } from "../orchard/console.ts";
 
 /*
  * [x] Collect md files
+ *     [ ] collect html files
  * [ ] Process md files
  *     [x] parse markdown
  *     [x] read frontmatter
@@ -33,6 +35,7 @@ import { insertAt } from "../orchard/string.ts";
  *         [ ] copy asset to /dist
  *     [x] render final html to file
  * [x] Copy to dist/ folder
+ * [ ] HMR
  */
 
 const {
@@ -58,12 +61,13 @@ export interface LayoutProps {
   frontmatter?: PostFrontmatter;
 }
 
-const addExt = (str: string, ext = ".html") =>
-  str.includes("#")
+export function addExt(str: string, ext = ".html") {
+  return str.includes("#")
     ? insertAt(str, str.indexOf("#"), ext)
     : str.includes("?")
     ? insertAt(str, str.indexOf("?"), ext)
     : str + ext;
+}
 
 function Layout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
   return (
@@ -180,7 +184,9 @@ export function processMd(
   return { html: html(parsed), frontmatter, headings };
 }
 
-export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) {
+export async function createHTML(
+  { srcDir = collectionDir, out = outDir, defaultLayout = Layout } = {},
+) {
   await emptyDir(out);
   const files = await collect(srcDir);
   const routes = files.map((f) => "/" + f.replace(/\.md$/i, ""));
@@ -200,11 +206,10 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
       file,
       routes,
     );
-    let LayoutToUse = Layout;
+    let LayoutToUse = defaultLayout;
 
     if (frontmatter) {
       if (frontmatter.layout) {
-        console.info(`Using custom layout ${frontmatter.layout} for ${file}`);
         try {
           LayoutToUse = (await import(frontmatter.layout)).default;
         } catch (err) {
@@ -213,6 +218,11 @@ export async function createHTML({ srcDir = collectionDir, out = outDir } = {}) 
       }
     }
 
+    console.debug(
+      `Using layout %c${LayoutToUse.name}%c for ${file}`,
+      "font-weight: bold",
+      "font-weight: normal",
+    );
     const rendered = renderSSR(() => (
       <LayoutToUse routes={routes} html={html} frontmatter={frontmatter} />
     ));
