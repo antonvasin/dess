@@ -69,25 +69,15 @@ interface ContentHeading {
 
 interface ContentEntry {
   html: string;
-  frontmatter?: PostFrontmatter;
   headings?: ContentHeading[];
 }
 
 export function processMd(
-  input: string,
+  markdown: string,
   page: string,
   routes: string[],
   baseUrl: string,
 ): ContentEntry {
-  let frontmatter: PostFrontmatter | undefined;
-  let markdown = input;
-
-  if (test(input)) {
-    const { attrs, body } = extract(input);
-    frontmatter = attrs;
-    markdown = body;
-  }
-
   const parsed = tokens(markdown);
   const headings: ContentHeading[] = [];
 
@@ -136,11 +126,12 @@ export function processMd(
   // console.log("After rewrite");
   // console.table(parsed);
   // console.dir(headings);
-  return { html: html(parsed), frontmatter, headings };
+  return { html: html(parsed), headings };
 }
 
 interface RenderOpts {
   layout?: (props: LayoutProps) => any;
+  frontmatter?: PostFrontmatter;
   routes?: string[];
   baseUrl?: string;
 }
@@ -150,8 +141,8 @@ export async function renderHtml(
   content: string,
   opts: RenderOpts = {},
 ): Promise<string> {
-  const { layout = DefaultLayout, routes = [], baseUrl = "" } = opts;
-  const { html, frontmatter, headings } = processMd(
+  const { layout = DefaultLayout, routes = [], baseUrl = "", frontmatter } = opts;
+  const { html, headings } = processMd(
     content,
     page,
     routes,
@@ -196,13 +187,21 @@ export async function writePage(
   outDir = "./dist",
   layout: (props: LayoutProps) => any,
 ) {
-  let content: string;
   const page = getPageName(path, srcDir);
   const routes = files.map((f) => getPageName(f, srcDir));
+
   try {
+    let content: string;
+    const opts: RenderOpts = { routes, layout };
     content = await Deno.readTextFile(path);
 
-    const html = await renderHtml(page, content, { routes, layout });
+    if (test(content)) {
+      const { attrs, body } = extract(content);
+      content = body;
+      opts.frontmatter = attrs;
+    }
+
+    const html = await renderHtml(page, content, opts);
 
     const out = `${outDir}${dirname(page)}`;
     await ensureDir(out);
