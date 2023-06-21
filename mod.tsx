@@ -276,6 +276,19 @@ export function DefaultLayout({ html, title = "Blog Title", routes = [] }: Layou
 
 let isDebug = false;
 
+const usage = `Deno Press
+    Creates static website from directory of markdown files.
+  USAGE:
+    dess [OPTIONS] [COMMAND]
+  COMMANDS:
+    help      Print this message
+    build     Build static website
+    serve     Run SSR server
+  OPTIONS:
+    --srcDir  Source directory with .md files (default: ./)
+    --outDir  Destination directory (default: ./dist)
+    --debug   Print debug information`;
+
 async function main() {
   const args = parse(Deno.args, {
     string: ["srcDir, outDir", "layout"],
@@ -285,37 +298,62 @@ async function main() {
       outDir: "./dist",
     },
   });
-  const srcDir = args.srcDir as string;
-  const outDir = args.outDir as string;
   isDebug = Boolean(args.debug);
+  const [cmd] = args._;
 
-  let LayoutToUse = DefaultLayout;
-  if (args.layout) {
-    try {
-      LayoutToUse = (await import(args.layout)).default;
-    } catch (err) {
-      console.error(
-        `Couldn't load layout %c${args.layout}. %cUsing default layout instead.\nFailed with %c${err.message}`,
-        bold,
-        reset,
-        red,
-      );
-    }
+  const printUsage = () => {
+    console.log(usage);
+    Deno.exit();
+  };
+
+  if (!cmd) {
+    printUsage();
   }
 
-  await emptyDir(outDir);
-  const files = await collect(srcDir);
+  if (cmd === "help") {
+    return printUsage();
+  } else if (cmd === "build") {
+    const srcDir = args.srcDir as string;
+    const outDir = args.outDir as string;
 
-  for (const file of files) {
-    if (isDebug) {
-      console.debug(
-        `\n\n--> Writing %c${file} %cto %c${outDir}`,
-        combineStyle(bold, blue),
-        reset,
-        combineStyle(bold, green),
-      );
+    console.info(
+      `Building %c${srcDir}%c -> %c${outDir}`,
+      combineStyle(bold, green),
+      reset,
+      combineStyle(bold, green),
+    );
+    let LayoutToUse = DefaultLayout;
+    if (args.layout) {
+      try {
+        LayoutToUse = (await import(args.layout)).default;
+      } catch (err) {
+        console.error(
+          `Couldn't load layout %c${args.layout}. %cUsing default layout instead.\nFailed with %c${err.message}`,
+          bold,
+          reset,
+          red,
+        );
+      }
     }
-    await writePage(file, files, srcDir, outDir, LayoutToUse);
+
+    await emptyDir(outDir);
+    const files = await collect(srcDir);
+
+    for (const file of files) {
+      if (isDebug) {
+        console.debug(
+          `\n\n--> Writing %c${file} %cto %c${outDir}`,
+          combineStyle(bold, blue),
+          reset,
+          combineStyle(bold, green),
+        );
+      }
+      await writePage(file, files, srcDir, outDir, LayoutToUse);
+    }
+    console.info("Done!");
+  } else if (cmd === "serve") {
+    console.error("Not implemented");
+    Deno.exit(1);
   }
 }
 
