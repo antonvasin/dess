@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
-import { basename, dirname, relative } from "https://deno.land/std@0.192.0/path/mod.ts";
+import { dirname, relative } from "https://deno.land/std@0.192.0/path/mod.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
 
 import { html, Token, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
@@ -25,7 +25,7 @@ import { insertAt } from "../orchard/string.ts";
  *     [x] return list of headers for a page
  *     [x] return meta from frontmatter
  * [ ] Render static files
- *     [ ] apply layout
+ *     [x] apply layout
  *         [x] read jsx file from frontmatter
  *         [x] render html
  *         [x] insert content into html
@@ -35,7 +35,7 @@ import { insertAt } from "../orchard/string.ts";
  *         [ ] copy asset to /dist
  *     [x] render final html to file
  * [x] Copy to dist/ folder
- * [ ] HMR
+ * [x] HMR
  */
 
 const extensions = [".md"];
@@ -46,15 +46,6 @@ const ignoreNames = [
   /contributing/i,
   /changelog/i,
 ];
-
-export interface LayoutProps {
-  html: string;
-  title?: string;
-  page: string;
-  routes?: string[];
-  headings?: ContentHeading[];
-  frontmatter?: PostFrontmatter;
-}
 
 export async function collect(dir: string) {
   const posts = [];
@@ -128,7 +119,7 @@ export function processMd(
       );
       const headerContent = html(parsed.slice(i + 1, tagEndIdx + i));
 
-      const headerAnchorLink = `<a href="/${addExt(page)}#${slugText}">[link]</a>`;
+      const headerAnchorLink = `[<a href="/${addExt(page)}#${slugText}">link</a>]`;
 
       const htmlHeader: Token = {
         type: "html",
@@ -155,14 +146,14 @@ interface RenderOpts {
 }
 
 export async function renderHtml(
-  file: string,
+  page: string,
   content: string,
   opts: RenderOpts = {},
 ): Promise<string> {
   const { layout = DefaultLayout, routes = [], baseUrl = "" } = opts;
   const { html, frontmatter, headings } = processMd(
     content,
-    file,
+    page,
     routes,
     baseUrl,
   );
@@ -180,7 +171,7 @@ export async function renderHtml(
 
   if (LayoutToUse !== DefaultLayout) {
     console.debug(
-      `Using layout %c${LayoutToUse.name}%c for ${file}`,
+      `Using layout %c${LayoutToUse.name}%c for ${page}`,
       "font-weight: bold",
       "font-weight: normal",
     );
@@ -191,7 +182,7 @@ export async function renderHtml(
       routes={routes}
       html={html}
       frontmatter={frontmatter}
-      page={file}
+      page={page}
       headings={headings}
     />
   ));
@@ -223,27 +214,7 @@ export async function writePage(
   }
 }
 
-async function main() {
-  const args = parse(Deno.args, {
-    string: ["srcDir, outDir", "baseUrl"],
-    default: {
-      srcDir: "./",
-      outDir: "./dist",
-      baseUrl: "http://localhost:3000",
-    },
-  });
-  const srcDir = args.srcDir as string;
-  const outDir = args.outDir as string;
-
-  await emptyDir(outDir);
-  const files = await collect(srcDir);
-
-  for (const file of files) {
-    await writePage(file, files, srcDir, outDir, DefaultLayout);
-  }
-}
-
-export function addExt(str: string, ext = ".html") {
+function addExt(str: string, ext = ".html") {
   return str.includes("#")
     ? insertAt(str, str.indexOf("#"), ext)
     : str.includes("?")
@@ -264,9 +235,22 @@ export function PageLink({ page, children }: LinkProps) {
   return <a href={addExt(page, ".html")}>{children}</a>;
 }
 
-function DefaultLayout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
+export interface LayoutProps {
+  html: string;
+  title?: string;
+  page: string;
+  routes?: string[];
+  headings?: ContentHeading[];
+  frontmatter?: PostFrontmatter;
+}
+
+export function DefaultLayout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
   return (
     <html>
+      <head>
+        <meta charset="utf-8" />
+        {title && <title>{title}</title>}
+      </head>
       <body>
         <header>
           {title && <h1>{title}</h1>}
@@ -284,6 +268,26 @@ function DefaultLayout({ html, title = "Blog Title", routes = [] }: LayoutProps)
       </body>
     </html>
   );
+}
+
+async function main() {
+  const args = parse(Deno.args, {
+    string: ["srcDir, outDir", "baseUrl"],
+    default: {
+      srcDir: "./",
+      outDir: "./dist",
+      baseUrl: "http://localhost:3000",
+    },
+  });
+  const srcDir = args.srcDir as string;
+  const outDir = args.outDir as string;
+
+  await emptyDir(outDir);
+  const files = await collect(srcDir);
+
+  for (const file of files) {
+    await writePage(file, files, srcDir, outDir, DefaultLayout);
+  }
 }
 
 if (import.meta.main) {
