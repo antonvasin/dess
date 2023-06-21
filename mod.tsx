@@ -191,14 +191,20 @@ export async function renderHtml(
   return rendered;
 }
 
-export async function writePage(path: string, files: string[], srcDir = ".", outDir = "./dist") {
+export async function writePage(
+  path: string,
+  files: string[],
+  srcDir = ".",
+  outDir = "./dist",
+  layout: (props: LayoutProps) => any,
+) {
   let content: string;
   const page = getPageName(path, srcDir);
   const routes = files.map((f) => getPageName(f, srcDir));
   try {
     content = await Deno.readTextFile(path);
 
-    const html = await renderHtml(page, content, { routes });
+    const html = await renderHtml(page, content, { routes, layout });
 
     const out = `${outDir}${dirname(page)}`;
     await ensureDir(out);
@@ -226,7 +232,7 @@ async function main() {
   const files = await collect(srcDir);
 
   for (const file of files) {
-    await writePage(file, files, srcDir, outDir);
+    await writePage(file, files, srcDir, outDir, DefaultLayout);
   }
 }
 
@@ -242,6 +248,15 @@ function getPageName(path: string, srcDir: string) {
   return "/" + relative(srcDir, path).replace(/\.(md|MD)$/, "");
 }
 
+export interface LinkProps {
+  page: string;
+  children?: any;
+}
+
+export function PageLink({ page, children }: LinkProps) {
+  return <a href={addExt(page, ".html")}>{children}</a>;
+}
+
 function DefaultLayout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
   return (
     <html>
@@ -252,7 +267,7 @@ function DefaultLayout({ html, title = "Blog Title", routes = [] }: LayoutProps)
             <ul>
               {routes.map((route) => (
                 <li>
-                  <a href={addExt(route)}>{route}</a>
+                  <PageLink page={route}>{route}</PageLink>
                 </li>
               ))}
             </ul>

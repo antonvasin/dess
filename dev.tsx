@@ -1,7 +1,7 @@
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-import { addExt, collect, LayoutProps, writePage } from "./mod.tsx";
+import { collect, LayoutProps, PageLink, writePage } from "./mod.tsx";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
 const HMR_CLIENT = `let socket;
@@ -55,7 +55,7 @@ function DevLayout({ html, title = "Dev Blog Title", routes = [] }: LayoutProps)
             <ul>
               {routes.map((route) => (
                 <li>
-                  <a href={addExt(route)}>{route}</a>
+                  <PageLink page={route}>{route}</PageLink>
                 </li>
               ))}
             </ul>
@@ -79,6 +79,7 @@ async function watchForChanges(
       for (const path of event.paths) {
         if (path.endsWith(".md")) {
           try {
+            console.dir(event);
             console.info(`File ${path} changed. Building…`);
             await updateFn(path);
             performance.mark("end-refresh");
@@ -100,10 +101,12 @@ async function watchForChanges(
 watchForChanges("./test", async (path) => {
   const files = await collect("./test");
   if (!path) {
-    return files.forEach(async (file) => await writePage(file, files, "./test", "./dist"));
+    return files.forEach(async (file) =>
+      await writePage(file, files, "./test", "./dist", DevLayout)
+    );
   }
 
-  await writePage(path, files, "./test", "./dist");
+  await writePage(path, files, "./test", "./dist", DevLayout);
 }).catch(
   console.error,
 );
