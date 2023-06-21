@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
 import { dirname, relative } from "https://deno.land/std@0.192.0/path/mod.ts";
@@ -7,7 +8,6 @@ import { html, Token, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/m
 import { slug } from "https://deno.land/x/slug@v1.1.0/mod.ts";
 import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { insertAt } from "../orchard/string.ts";
-import { bold } from "../orchard/console.ts";
 
 /*
  * [x] Collect md files
@@ -38,12 +38,6 @@ import { bold } from "../orchard/console.ts";
  * [ ] HMR
  */
 
-const {
-  collectionDir = "./",
-  outDir = "./dist",
-  baseUrl = "http://localhost:3000",
-} = parse(Deno.args);
-
 const extensions = [".md"];
 
 const ignoreNames = [
@@ -59,36 +53,6 @@ export interface LayoutProps {
   routes?: string[];
   headings?: ContentHeading[];
   frontmatter?: PostFrontmatter;
-}
-
-export function addExt(str: string, ext = ".html") {
-  return str.includes("#")
-    ? insertAt(str, str.indexOf("#"), ext)
-    : str.includes("?")
-    ? insertAt(str, str.indexOf("?"), ext)
-    : str + ext;
-}
-
-function Layout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
-  return (
-    <html>
-      <body>
-        <header>
-          {title && <h1>{title}</h1>}
-          <nav>
-            <ul>
-              {routes.map((route) => (
-                <li>
-                  <a href={addExt(route)}>{route}</a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </header>
-        <main innerHTML={{ __dangerousHtml: html }} />
-      </body>
-    </html>
-  );
 }
 
 export async function collect(dir: string) {
@@ -121,6 +85,7 @@ export function processMd(
   input: string,
   page: string,
   routes: string[],
+  baseUrl: string,
 ): ContentEntry {
   let frontmatter: PostFrontmatter | undefined;
   let markdown = input;
@@ -162,9 +127,7 @@ export function processMd(
       );
       const headerContent = html(parsed.slice(i + 1, tagEndIdx + i));
 
-      const headerAnchorLink = `<a href="/${
-        page.replace(/\.md$/, ".html")
-      }#${slugText}">[link]</a>`;
+      const headerAnchorLink = `<a href="/${addExt(page)}#${slugText}">[link]</a>`;
 
       const htmlHeader: Token = {
         type: "html",
@@ -184,52 +147,112 @@ export function processMd(
   return { html: html(parsed), frontmatter, headings };
 }
 
-export async function createHTML(
-  { srcDir = collectionDir, out = outDir, defaultLayout = Layout } = {},
-) {
-  await emptyDir(out);
-  const files = await collect(srcDir);
-  const routes = files.map((f) => "/" + f.replace(/\.md$/i, ""));
+interface RenderOpts {
+  defaultLayout?: (props: LayoutProps) => any;
+  routes: string[];
+  baseUrl?: string;
+}
 
-  for await (const file of files) {
-    let content: string;
-    try {
-      content = await Deno.readTextFile(`${srcDir}/${file}`);
-    } catch (err) {
-      console.error(
-        `Couldn't read file ${file}. Failed with:\n\n${err.message}`,
-      );
-      throw (err);
-    }
-    const { html, frontmatter } = processMd(
-      content,
-      file,
-      routes,
-    );
-    let LayoutToUse = defaultLayout;
+export async function renderHtml(
+  file: string,
+  content: string,
+  { defaultLayout = DefaultLayout, routes, baseUrl = "" }: RenderOpts,
+): Promise<string> {
+  const { html, frontmatter } = processMd(
+    content,
+    file,
+    routes,
+    baseUrl,
+  );
+  let LayoutToUse = defaultLayout;
 
-    if (frontmatter) {
-      if (frontmatter.layout) {
-        try {
-          LayoutToUse = (await import(frontmatter.layout)).default;
-        } catch (err) {
-          console.error(`Couldn't use template ${frontmatter.layout}, using default Layout`);
-        }
+  if (frontmatter) {
+    if (frontmatter.layout) {
+      try {
+        LayoutToUse = (await import(frontmatter.layout)).default;
+      } catch (err) {
+        console.error(`Couldn't use template ${frontmatter.layout}, using default Layout`);
       }
     }
+  }
 
+  if (LayoutToUse !== DefaultLayout) {
     console.debug(
       `Using layout %c${LayoutToUse.name}%c for ${file}`,
       "font-weight: bold",
       "font-weight: normal",
     );
-    const rendered = renderSSR(() => (
-      <LayoutToUse routes={routes} html={html} frontmatter={frontmatter} />
-    ));
-
-    const outDir = `${out}/${dirname(file.replace(srcDir, ""))}`;
-    await ensureDir(outDir);
-
-    Deno.writeTextFile(`${out}/${file.replace(/\.md$/, ".html")}`, rendered);
   }
+
+  const rendered = renderSSR(() => (
+    <LayoutToUse routes={routes} html={html} frontmatter={frontmatter} />
+  ));
+  return rendered;
+}
+
+export async function main() {
+  const args = parse(Deno.args, {
+    string: ["srcDir, outDir", "baseUrl"],
+    default: {
+      srcDir: "./",
+      outDir: "./dist",
+      baseUrl: "http://localhost:3000",
+    },
+  });
+
+  await emptyDir(String(args.outDir));
+  const files = await collect(String(args.srcDir));
+  const routes = files.map((f) => "/" + f.replace(/\.md$/i, ""));
+
+  for await (const file of files) {
+    let content: string;
+    const page = file.replace(/\.md$/, "");
+    try {
+      content = await Deno.readTextFile(`${args.srcDir}/${file}`);
+
+      const html = await renderHtml(page, content, { routes });
+
+      const out = `${args.outDir}/${dirname(file.replace(args.srcDir as string, ""))}`;
+      await ensureDir(out);
+
+      Deno.writeTextFile(`${args.outDir}/${addExt(page)}`, html);
+    } catch (err) {
+      console.error(`Couldn't read file ${file}`);
+      throw (err);
+    }
+  }
+}
+
+export function addExt(str: string, ext = ".html") {
+  return str.includes("#")
+    ? insertAt(str, str.indexOf("#"), ext)
+    : str.includes("?")
+    ? insertAt(str, str.indexOf("?"), ext)
+    : str + ext;
+}
+
+function DefaultLayout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
+  return (
+    <html>
+      <body>
+        <header>
+          {title && <h1>{title}</h1>}
+          <nav>
+            <ul>
+              {routes.map((route) => (
+                <li>
+                  <a href={addExt(route)}>{route}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </header>
+        <main innerHTML={{ __dangerousHtml: html }} />
+      </body>
+    </html>
+  );
+}
+
+if (import.meta.main) {
+  main();
 }

@@ -1,7 +1,7 @@
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-import { addExt, createHTML, LayoutProps } from "./mod.tsx";
+import { addExt, LayoutProps, renderHtml } from "./mod.tsx";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
 const HMR_CLIENT = `let socket;
@@ -94,7 +94,10 @@ async function watchForChanges(postsDirectory: string, updateFn: () => Promise<u
   }
 }
 
-watchForChanges("./test", () => createHTML({ srcDir: "./test", defaultLayout: DevLayout })).catch(
+watchForChanges("./test", async () => {
+  // renderHtml({ srcDir: "./test", layout: DevLayout });
+  return await (new Deno.Command("deno", { args: ["task", "test-build"] })).output();
+}).catch(
   console.error,
 );
 
