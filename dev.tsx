@@ -23,15 +23,14 @@ function hmrSocket(callback) {
   socket.addEventListener("open", callback);
   socket.addEventListener("message", (event) => {
     const data = JSON.parse(event.data)
-    console.log({ data, event})
     if (data.type === "refresh") {
-      console.log("refreshings");
+      console.log("[HMR] Refreshing…");
       window.location.reload();
     }
   });
 
   socket.addEventListener("close", () => {
-    console.log("reconnecting...");
+    console.log("[HMR] Reconnecting...");
     clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(() => {
       hmrSocket(() => {
@@ -42,7 +41,9 @@ function hmrSocket(callback) {
 }
 `;
 
-function DevLayout({ html, title = "Dev Blog Title", routes = [] }: LayoutProps) {
+function DevLayout(
+  { html, title = "Dev Blog Title", routes = [], page, headings = [] }: LayoutProps,
+) {
   return (
     <html>
       <head>
@@ -62,6 +63,32 @@ function DevLayout({ html, title = "Dev Blog Title", routes = [] }: LayoutProps)
           </nav>
         </header>
         <main innerHTML={{ __dangerousHtml: html }} />
+        <hr />
+        <footer>
+          <dl>
+            <dt>Page name</dt>
+            <dd>
+              <pre>{page}</pre>
+            </dd>
+
+            <dt>Current page headings</dt>
+            <dd>
+              <dl>
+                {headings.map((heading) => (
+                  <div>
+                    <dt>{heading.text}</dt>
+                    <dd>
+                      <pre>{heading.slug}</pre>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </dd>
+
+            <dt>Page count</dt>
+            <dd>{routes.length}</dd>
+          </dl>
+        </footer>
       </body>
     </html>
   );
@@ -79,7 +106,6 @@ async function watchForChanges(
       for (const path of event.paths) {
         if (path.endsWith(".md")) {
           try {
-            console.dir(event);
             console.info(`File ${path} changed. Building…`);
             await updateFn(path);
             performance.mark("end-refresh");

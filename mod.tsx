@@ -50,6 +50,7 @@ const ignoreNames = [
 export interface LayoutProps {
   html: string;
   title?: string;
+  page: string;
   routes?: string[];
   headings?: ContentHeading[];
   frontmatter?: PostFrontmatter;
@@ -159,7 +160,7 @@ export async function renderHtml(
   opts: RenderOpts = {},
 ): Promise<string> {
   const { layout = DefaultLayout, routes = [], baseUrl = "" } = opts;
-  const { html, frontmatter } = processMd(
+  const { html, frontmatter, headings } = processMd(
     content,
     file,
     routes,
@@ -186,7 +187,13 @@ export async function renderHtml(
   }
 
   const rendered = renderSSR(() => (
-    <LayoutToUse routes={routes} html={html} frontmatter={frontmatter} />
+    <LayoutToUse
+      routes={routes}
+      html={html}
+      frontmatter={frontmatter}
+      page={file}
+      headings={headings}
+    />
   ));
   return rendered;
 }
