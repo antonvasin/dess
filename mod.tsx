@@ -4,10 +4,15 @@ import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.
 import { dirname, relative } from "https://deno.land/std@0.192.0/path/mod.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
 
-import { html, Token, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
+import {
+  html as renderTokens,
+  Token,
+  tokens,
+} from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
 import { slug } from "https://deno.land/x/slug@v1.1.0/mod.ts";
 import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { insertAt } from "../orchard/string.ts";
+import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.ts";
 
 /*
  * [x] Collect md files
@@ -68,20 +73,22 @@ interface ContentHeading {
 }
 
 interface ContentEntry {
-  html: string;
+  tokens: Token[];
   headings?: ContentHeading[];
 }
 
 export function processMd(
-  markdown: string,
   page: string,
+  markdown: string,
   routes: string[],
 ): ContentEntry {
   const parsed = tokens(markdown);
   const headings: ContentHeading[] = [];
 
-  // console.log("Before rewrite", page);
-  // console.table(parsed);
+  if (isDebug) {
+    console.log(`Tokens for %c${page} %cbefore rewrite:`, bold, reset);
+    console.dir(parsed);
+  }
 
   parsed.forEach((token, i, ary) => {
     // Rewrite links
@@ -106,7 +113,7 @@ export function processMd(
       const tagEndIdx = parsed.slice(i).findIndex((token) =>
         token.type === "end" && token.tag === "heading"
       );
-      const headerContent = html(parsed.slice(i + 1, tagEndIdx + i));
+      const headerContent = renderTokens(parsed.slice(i + 1, tagEndIdx + i));
 
       const headerAnchorLink = `[<a href="${addExt(page)}#${slugText}">link</a>]`;
 
@@ -122,10 +129,12 @@ export function processMd(
     }
   });
 
-  // console.log("After rewrite");
-  // console.table(parsed);
-  // console.dir(headings);
-  return { html: html(parsed), headings };
+  if (isDebug) {
+    console.log("\nTokens after rewrite:");
+    console.dir(parsed);
+    console.dir(headings);
+  }
+  return { tokens: parsed, headings };
 }
 
 interface RenderOpts {
@@ -140,9 +149,9 @@ export async function renderHtml(
   opts: RenderOpts = {},
 ): Promise<string> {
   const { layout = DefaultLayout, routes = [], frontmatter } = opts;
-  const { html, headings } = processMd(
-    content,
+  const { tokens, headings } = processMd(
     page,
+    content,
     routes,
   );
   let LayoutToUse = layout;
@@ -157,18 +166,18 @@ export async function renderHtml(
     }
   }
 
-  if (LayoutToUse !== DefaultLayout) {
+  if (LayoutToUse !== DefaultLayout && isDebug) {
     console.debug(
       `Using layout %c${LayoutToUse.name}%c for ${page}`,
-      "font-weight: bold",
-      "font-weight: normal",
+      combineStyle(bold, blue),
+      reset,
     );
   }
 
   const rendered = renderSSR(() => (
     <LayoutToUse
       routes={routes}
-      html={html}
+      html={renderTokens(tokens)}
       frontmatter={frontmatter}
       page={page}
       headings={headings}
@@ -265,9 +274,12 @@ export function DefaultLayout({ html, title = "Blog Title", routes = [] }: Layou
   );
 }
 
+let isDebug = false;
+
 async function main() {
   const args = parse(Deno.args, {
     string: ["srcDir, outDir", "layout"],
+    boolean: ["debug"],
     default: {
       srcDir: "./",
       outDir: "./dist",
@@ -275,16 +287,34 @@ async function main() {
   });
   const srcDir = args.srcDir as string;
   const outDir = args.outDir as string;
+  isDebug = Boolean(args.debug);
 
   let LayoutToUse = DefaultLayout;
   if (args.layout) {
-    LayoutToUse = (await import(args.layout)).default;
+    try {
+      LayoutToUse = (await import(args.layout)).default;
+    } catch (err) {
+      console.error(
+        `Couldn't load layout %c${args.layout}. %cUsing default layout instead.\nFailed with %c${err.message}`,
+        bold,
+        reset,
+        red,
+      );
+    }
   }
 
   await emptyDir(outDir);
   const files = await collect(srcDir);
 
   for (const file of files) {
+    if (isDebug) {
+      console.debug(
+        `\n\n--> Writing %c${file} %cto %c${outDir}`,
+        combineStyle(bold, blue),
+        reset,
+        combineStyle(bold, green),
+      );
+    }
     await writePage(file, files, srcDir, outDir, LayoutToUse);
   }
 }
