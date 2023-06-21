@@ -188,9 +188,8 @@ export async function writePage(
   const routes = files.map((f) => getPageName(f, srcDir));
 
   try {
-    let content: string;
+    let content = await Deno.readTextFile(path);
     const opts: RenderOpts = { routes, layout };
-    content = await Deno.readTextFile(path);
 
     if (test(content)) {
       const { attrs, body } = extract(content);
@@ -268,7 +267,7 @@ export function DefaultLayout({ html, title = "Blog Title", routes = [] }: Layou
 
 async function main() {
   const args = parse(Deno.args, {
-    string: ["srcDir, outDir"],
+    string: ["srcDir, outDir", "layout"],
     default: {
       srcDir: "./",
       outDir: "./dist",
@@ -277,11 +276,16 @@ async function main() {
   const srcDir = args.srcDir as string;
   const outDir = args.outDir as string;
 
+  let LayoutToUse = DefaultLayout;
+  if (args.layout) {
+    LayoutToUse = (await import(args.layout)).default;
+  }
+
   await emptyDir(outDir);
   const files = await collect(srcDir);
 
   for (const file of files) {
-    await writePage(file, files, srcDir, outDir, DefaultLayout);
+    await writePage(file, files, srcDir, outDir, LayoutToUse);
   }
 }
 

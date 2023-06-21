@@ -1,7 +1,7 @@
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { LayoutProps } from "../mod.tsx";
 
-export default function Layout({ html }: LayoutProps) {
+export default function TestLayout({ html }: LayoutProps) {
   return (
     <html>
       <body>
