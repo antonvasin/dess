@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
-import { dirname, relative } from "https://deno.land/std@0.192.0/path/mod.ts";
+import { basename, dirname, relative } from "https://deno.land/std@0.192.0/path/mod.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
 
 import { html, Token, tokens } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
@@ -58,7 +58,7 @@ export interface LayoutProps {
 export async function collect(dir: string) {
   const posts = [];
   for await (const file of walk(dir, { exts: extensions, skip: ignoreNames })) {
-    posts.push(relative(dir, file.path));
+    posts.push(file.path);
   }
   return posts;
 }
@@ -148,23 +148,24 @@ export function processMd(
 }
 
 interface RenderOpts {
-  defaultLayout?: (props: LayoutProps) => any;
-  routes: string[];
+  layout?: (props: LayoutProps) => any;
+  routes?: string[];
   baseUrl?: string;
 }
 
 export async function renderHtml(
   file: string,
   content: string,
-  { defaultLayout = DefaultLayout, routes, baseUrl = "" }: RenderOpts,
+  opts: RenderOpts = {},
 ): Promise<string> {
+  const { layout = DefaultLayout, routes = [], baseUrl = "" } = opts;
   const { html, frontmatter } = processMd(
     content,
     file,
     routes,
     baseUrl,
   );
-  let LayoutToUse = defaultLayout;
+  let LayoutToUse = layout;
 
   if (frontmatter) {
     if (frontmatter.layout) {
@@ -190,7 +191,26 @@ export async function renderHtml(
   return rendered;
 }
 
-export async function main() {
+export async function writePage(path: string, files: string[], srcDir = ".", outDir = "./dist") {
+  let content: string;
+  const page = getPageName(path, srcDir);
+  const routes = files.map((f) => getPageName(f, srcDir));
+  try {
+    content = await Deno.readTextFile(path);
+
+    const html = await renderHtml(page, content, { routes });
+
+    const out = `${outDir}${dirname(page)}`;
+    await ensureDir(out);
+
+    Deno.writeTextFile(`${outDir}${addExt(page)}`, html);
+  } catch (err) {
+    console.error(`Couldn't read file ${path}`);
+    throw (err);
+  }
+}
+
+async function main() {
   const args = parse(Deno.args, {
     string: ["srcDir, outDir", "baseUrl"],
     default: {
@@ -199,27 +219,14 @@ export async function main() {
       baseUrl: "http://localhost:3000",
     },
   });
+  const srcDir = args.srcDir as string;
+  const outDir = args.outDir as string;
 
-  await emptyDir(String(args.outDir));
-  const files = await collect(String(args.srcDir));
-  const routes = files.map((f) => "/" + f.replace(/\.md$/i, ""));
+  await emptyDir(outDir);
+  const files = await collect(srcDir);
 
-  for await (const file of files) {
-    let content: string;
-    const page = file.replace(/\.md$/, "");
-    try {
-      content = await Deno.readTextFile(`${args.srcDir}/${file}`);
-
-      const html = await renderHtml(page, content, { routes });
-
-      const out = `${args.outDir}/${dirname(file.replace(args.srcDir as string, ""))}`;
-      await ensureDir(out);
-
-      Deno.writeTextFile(`${args.outDir}/${addExt(page)}`, html);
-    } catch (err) {
-      console.error(`Couldn't read file ${file}`);
-      throw (err);
-    }
+  for (const file of files) {
+    await writePage(file, files, srcDir, outDir);
   }
 }
 
@@ -229,6 +236,10 @@ export function addExt(str: string, ext = ".html") {
     : str.includes("?")
     ? insertAt(str, str.indexOf("?"), ext)
     : str + ext;
+}
+
+function getPageName(path: string, srcDir: string) {
+  return "/" + relative(srcDir, path).replace(/\.(md|MD)$/, "");
 }
 
 function DefaultLayout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
