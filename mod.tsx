@@ -76,7 +76,6 @@ export function processMd(
   markdown: string,
   page: string,
   routes: string[],
-  baseUrl: string,
 ): ContentEntry {
   const parsed = tokens(markdown);
   const headings: ContentHeading[] = [];
@@ -87,7 +86,7 @@ export function processMd(
   parsed.forEach((token, i, ary) => {
     // Rewrite links
     if (token.type === "start" && token.tag === "link" && routes.includes(token.url)) {
-      token.url = addExt(baseUrl + token.url);
+      token.url = addExt(token.url);
     }
 
     // Rewrite headings
@@ -109,7 +108,7 @@ export function processMd(
       );
       const headerContent = html(parsed.slice(i + 1, tagEndIdx + i));
 
-      const headerAnchorLink = `[<a href="/${addExt(page)}#${slugText}">link</a>]`;
+      const headerAnchorLink = `[<a href="${addExt(page)}#${slugText}">link</a>]`;
 
       const htmlHeader: Token = {
         type: "html",
@@ -133,7 +132,6 @@ interface RenderOpts {
   layout?: (props: LayoutProps) => any;
   frontmatter?: PostFrontmatter;
   routes?: string[];
-  baseUrl?: string;
 }
 
 export async function renderHtml(
@@ -141,12 +139,11 @@ export async function renderHtml(
   content: string,
   opts: RenderOpts = {},
 ): Promise<string> {
-  const { layout = DefaultLayout, routes = [], baseUrl = "", frontmatter } = opts;
+  const { layout = DefaultLayout, routes = [], frontmatter } = opts;
   const { html, headings } = processMd(
     content,
     page,
     routes,
-    baseUrl,
   );
   let LayoutToUse = layout;
 
@@ -271,11 +268,10 @@ export function DefaultLayout({ html, title = "Blog Title", routes = [] }: Layou
 
 async function main() {
   const args = parse(Deno.args, {
-    string: ["srcDir, outDir", "baseUrl"],
+    string: ["srcDir, outDir"],
     default: {
       srcDir: "./",
       outDir: "./dist",
-      baseUrl: "http://localhost:3000",
     },
   });
   const srcDir = args.srcDir as string;
