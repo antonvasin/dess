@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
-import { dirname, relative } from "https://deno.land/std@0.192.0/path/mod.ts";
+import { dirname, relative, resolve } from "https://deno.land/std@0.192.0/path/mod.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
 
 import {
@@ -50,6 +50,9 @@ const ignoreNames = [
   /license/i,
   /contributing/i,
   /changelog/i,
+  /node_modules/i,
+  // ignore dotfiles
+  /\/\./,
 ];
 
 export async function collect(dir: string) {
@@ -325,7 +328,7 @@ async function main() {
     let LayoutToUse = DefaultLayout;
     if (args.layout) {
       try {
-        LayoutToUse = (await import(args.layout)).default;
+        LayoutToUse = (await import(resolve(Deno.cwd(), args.layout))).default;
       } catch (err) {
         console.error(
           `Couldn't load layout %c${args.layout}. %cUsing default layout instead.\nFailed with %c${err.message}`,
