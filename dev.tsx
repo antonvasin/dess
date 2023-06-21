@@ -133,9 +133,7 @@ watchForChanges("./test", async (path) => {
   }
 
   await writePage(path, files, "./test", "./dist", DevLayout);
-}).catch(
-  console.error,
-);
+}).catch(console.error);
 
 await serve(async (req) => {
   const { pathname } = new URL(req.url);
