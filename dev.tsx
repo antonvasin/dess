@@ -1,7 +1,7 @@
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-import { addExt, LayoutProps, renderHtml } from "./mod.tsx";
+import { addExt, collect, LayoutProps, writePage } from "./mod.tsx";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
 const HMR_CLIENT = `let socket;
@@ -67,7 +67,10 @@ function DevLayout({ html, title = "Dev Blog Title", routes = [] }: LayoutProps)
   );
 }
 
-async function watchForChanges(postsDirectory: string, updateFn: () => Promise<unknown>) {
+async function watchForChanges(
+  postsDirectory: string,
+  updateFn: (path?: string) => Promise<unknown>,
+) {
   await updateFn();
   const watcher = Deno.watchFs(postsDirectory);
   for await (const event of watcher) {
@@ -77,7 +80,7 @@ async function watchForChanges(postsDirectory: string, updateFn: () => Promise<u
         if (path.endsWith(".md")) {
           try {
             console.info(`File ${path} changed. Building…`);
-            await updateFn();
+            await updateFn(path);
             performance.mark("end-refresh");
             const refreshDur =
               performance.measure("refersh time", "start-refresh", "end-refresh").duration;
@@ -94,9 +97,13 @@ async function watchForChanges(postsDirectory: string, updateFn: () => Promise<u
   }
 }
 
-watchForChanges("./test", async () => {
-  // renderHtml({ srcDir: "./test", layout: DevLayout });
-  return await (new Deno.Command("deno", { args: ["task", "test-build"] })).output();
+watchForChanges("./test", async (path) => {
+  const files = await collect("./test");
+  if (!path) {
+    return files.forEach(async (file) => await writePage(file, files, "./test", "./dist"));
+  }
+
+  await writePage(path, files, "./test", "./dist");
 }).catch(
   console.error,
 );
