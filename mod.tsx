@@ -1,7 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
-import { dirname, relative, resolve } from "https://deno.land/std@0.192.0/path/mod.ts";
+import {
+  basename,
+  dirname,
+  join,
+  relative,
+  resolve,
+} from "https://deno.land/std@0.192.0/path/mod.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
 
 import {
@@ -12,6 +18,7 @@ import {
 import { slug } from "https://deno.land/x/slug@v1.1.0/mod.ts";
 import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { insertAt } from "../orchard/string.ts";
+import { formatDuration } from "../orchard/time.ts";
 import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.ts";
 
 /*
@@ -44,6 +51,8 @@ import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.
  */
 
 const extensions = [".md"];
+
+const publicDir = "public";
 
 const ignoreNames = [
   /readme/i,
@@ -221,6 +230,23 @@ export async function writePage(
   }
 }
 
+async function copyPublic(srcDir: string, outDir: string) {
+  await ensureDir(join(outDir, publicDir));
+  for await (const file of walk(resolve(srcDir, publicDir), { skip: ignoreNames })) {
+    if (file.isFile) {
+      const path = join(outDir, publicDir, basename(file.path));
+      if (isDebug) {
+        console.debug(
+          `Copying static file %c${basename(file.path)}`,
+          combineStyle(green, bold),
+        );
+      }
+
+      await Deno.copyFile(file.path, path);
+    }
+  }
+}
+
 function addExt(str: string, ext = ".html") {
   return str.includes("#")
     ? insertAt(str, str.indexOf("#"), ext)
@@ -316,6 +342,7 @@ async function main() {
   if (cmd === "help") {
     return printUsage();
   } else if (cmd === "build") {
+    performance.mark("build");
     const srcDir = args.srcDir as string;
     const outDir = args.outDir as string;
 
@@ -353,7 +380,11 @@ async function main() {
       }
       await writePage(file, files, srcDir, outDir, LayoutToUse);
     }
-    console.info("Done!");
+    await copyPublic(srcDir, outDir);
+
+    performance.mark("build-end");
+    const buildTime = performance.measure("boild-time", "build", "build-end");
+    console.info(`Done in ${formatDuration(buildTime.duration)}!`);
   } else if (cmd === "serve") {
     console.error("Not implemented");
     Deno.exit(1);
