@@ -49,7 +49,7 @@ function DevLayout(
   return (
     <html>
       <head>
-        <script src="/hmr.js" type="module" async></script>
+        <script src="/hmr.js" type="module" async />
       </head>
       <body>
         <header>
@@ -142,12 +142,15 @@ const layout = args.layout;
 watchForChanges(srcDir, async (path) => {
   const Layout = layout ? (await import(resolve(Deno.cwd(), layout as string))).default : DevLayout;
   const files = await collect(srcDir);
+  const devScript = "/hmr.js";
 
   if (!path) {
-    return files.forEach(async (file) => await writePage(file, files, srcDir, outDir, Layout));
+    return files.forEach(async (file) =>
+      await writePage(file, files, srcDir, outDir, Layout, devScript)
+    );
   }
 
-  await writePage(path, files, srcDir, outDir, Layout);
+  await writePage(path, files, srcDir, outDir, Layout, devScript);
 }).catch(console.error);
 
 await serve(async (req) => {

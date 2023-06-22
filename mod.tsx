@@ -154,6 +154,7 @@ interface RenderOpts {
   layout?: (props: LayoutProps) => any;
   frontmatter?: PostFrontmatter;
   routes?: string[];
+  devScript?: string;
 }
 
 export async function renderHtml(
@@ -194,6 +195,7 @@ export async function renderHtml(
       frontmatter={frontmatter}
       page={page}
       headings={headings}
+      devScript={opts.devScript}
     />
   ));
   return rendered;
@@ -205,13 +207,14 @@ export async function writePage(
   srcDir = ".",
   outDir = "./dist",
   layout = DefaultLayout,
+  devScript?: string,
 ) {
   const page = getPageName(path, srcDir);
   const routes = files.map((f) => getPageName(f, srcDir));
 
   try {
     let content = await Deno.readTextFile(path);
-    const opts: RenderOpts = { routes, layout };
+    const opts: RenderOpts = { routes, layout, devScript };
 
     if (test(content)) {
       const { attrs, body } = extract(content);
@@ -276,6 +279,7 @@ export interface LayoutProps {
   routes?: string[];
   headings?: ContentHeading[];
   frontmatter?: PostFrontmatter;
+  devScript?: string;
 }
 
 export function DefaultLayout({ html, title = "Title", routes = [] }: LayoutProps) {
