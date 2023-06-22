@@ -1,3 +1,4 @@
+import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
@@ -110,8 +111,8 @@ async function watchForChanges(
             await updateFn(path);
             performance.mark("end-refresh");
             const refreshDur =
-              performance.measure("refersh time", "start-refresh", "end-refresh").duration;
-            console.info(`Refershed in ${refreshDur.toFixed(2)}ms`);
+              performance.measure("refresh time", "start-refresh", "end-refresh").duration;
+            console.info(`Refreshed in ${refreshDur.toFixed(2)}ms`);
             HMR_SOCKETS.forEach((socket) => {
               socket.send(JSON.stringify({ type: "refresh" }));
             });
@@ -124,15 +125,25 @@ async function watchForChanges(
   }
 }
 
-watchForChanges("./test", async (path) => {
-  const files = await collect("./test");
+const args = parse(Deno.args, {
+  string: ["srcDir, outDir", "layout"],
+  boolean: ["debug"],
+  default: {
+    srcDir: "./",
+    outDir: "./dist",
+  },
+});
+
+const srcDir = args.srcDir as string;
+const outDir = args.outDir as string;
+
+watchForChanges(srcDir, async (path) => {
+  const files = await collect(srcDir);
   if (!path) {
-    return files.forEach(async (file) =>
-      await writePage(file, files, "./test", "./dist", DevLayout)
-    );
+    return files.forEach(async (file) => await writePage(file, files, srcDir, outDir, DevLayout));
   }
 
-  await writePage(path, files, "./test", "./dist", DevLayout);
+  await writePage(path, files, srcDir, outDir, DevLayout);
 }).catch(console.error);
 
 await serve(async (req) => {

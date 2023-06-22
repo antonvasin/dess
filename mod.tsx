@@ -24,6 +24,7 @@ import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.
 /*
  * [x] Collect md files
  *     [ ] collect html files
+ *     [ ] collect custom 404 page
  * [ ] Process md files
  *     [x] parse markdown
  *     [x] read frontmatter
@@ -47,6 +48,7 @@ import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.
  *         [ ] copy asset to /dist
  *     [x] render final html to file
  * [x] Copy to dist/ folder
+ * [x] copy public files
  * [x] HMR
  */
 
