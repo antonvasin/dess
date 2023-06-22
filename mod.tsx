@@ -9,7 +9,6 @@ import {
   resolve,
 } from "https://deno.land/std@0.192.0/path/mod.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
-
 import {
   html as renderTokens,
   Token,
@@ -205,7 +204,7 @@ export async function writePage(
   files: string[],
   srcDir = ".",
   outDir = "./dist",
-  layout: (props: LayoutProps) => any,
+  layout = DefaultLayout,
 ) {
   const page = getPageName(path, srcDir);
   const routes = files.map((f) => getPageName(f, srcDir));
@@ -279,7 +278,7 @@ export interface LayoutProps {
   frontmatter?: PostFrontmatter;
 }
 
-export function DefaultLayout({ html, title = "Blog Title", routes = [] }: LayoutProps) {
+export function DefaultLayout({ html, title = "Title", routes = [] }: LayoutProps) {
   return (
     <html>
       <head>

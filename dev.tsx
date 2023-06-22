@@ -2,6 +2,7 @@ import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
+import { resolve } from "https://deno.land/std@0.192.0/path/mod.ts";
 import { collect, LayoutProps, PageLink, writePage } from "./mod.tsx";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
@@ -136,14 +137,17 @@ const args = parse(Deno.args, {
 
 const srcDir = args.srcDir as string;
 const outDir = args.outDir as string;
+const layout = args.layout;
 
 watchForChanges(srcDir, async (path) => {
+  const Layout = layout ? (await import(resolve(Deno.cwd(), layout as string))).default : DevLayout;
   const files = await collect(srcDir);
+
   if (!path) {
-    return files.forEach(async (file) => await writePage(file, files, srcDir, outDir, DevLayout));
+    return files.forEach(async (file) => await writePage(file, files, srcDir, outDir, Layout));
   }
 
-  await writePage(path, files, srcDir, outDir, DevLayout);
+  await writePage(path, files, srcDir, outDir, Layout);
 }).catch(console.error);
 
 await serve(async (req) => {
