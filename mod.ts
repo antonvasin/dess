@@ -15,14 +15,14 @@ import {
   tokens,
 } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
 import { slug } from "https://deno.land/x/slug@v1.1.0/mod.ts";
-import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
+import { h, Helmet, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { insertAt } from "../orchard/string.ts";
 import { formatDuration } from "../orchard/time.ts";
 import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.ts";
 import { exists } from "https://deno.land/std@0.192.0/fs/exists.ts";
 import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve as _serve, ServeInit } from "https://deno.land/std@0.192.0/http/server.ts";
-import { DefaultLayout, LayoutComponent } from "./Components.tsx";
+import { DefaultLayout, LayoutComponent, NotFound } from "./Components.tsx";
 import { Status } from "https://deno.land/std@0.192.0/http/http_status.ts";
 
 /*
@@ -319,16 +319,22 @@ export async function build({ srcDir, outDir, layout }: BuildOpts) {
   performance.mark("build-end");
 }
 
-function serve(dir: string, opts?: ServeInit) {
-  _serve(async (req) => {
-    const res = await serveDir(req, { fsRoot: dir });
-    return res.status === Status.NotFound
-      ? new Response("Not found (TODO: implement)", {
+export async function handler(req: Request, dir: string) {
+  const res = await serveDir(req, { fsRoot: dir });
+  if (res.status === Status.NotFound) {
+    return new Response(
+      renderSSR(() => h(NotFound, { url: req.url }, {})),
+      {
         status: 404,
         headers: { "content-type": "text/html" },
-      })
-      : res;
-  }, opts);
+      },
+    );
+  }
+  return res;
+}
+
+function serve(dir: string, opts?: ServeInit) {
+  _serve((req) => handler(req, dir), opts);
 }
 
 let isDebug = false;

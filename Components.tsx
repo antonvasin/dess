@@ -92,3 +92,31 @@ export function RedBox({ err }: ErrorProps) {
     </html>
   );
 }
+
+export function NotFound({ url }: { url?: string }) {
+  return (
+    <html>
+      <head>
+        <Helmet>
+          <style>
+            {`body {
+                height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                flex-direction: column;
+                font-size: 24px;
+                font-family: sans-serif;
+              }
+              .h1 { font-family: monospace; }`}
+          </style>
+        </Helmet>
+      </head>
+      <body>
+        <h1>404</h1>
+        {url &&
+          <p>File {(new URL(url)).pathname} not found</p>}
+      </body>
+    </html>
+  );
+}
