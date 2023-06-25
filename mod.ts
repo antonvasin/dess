@@ -26,6 +26,7 @@ import { DefaultLayout, LayoutComponent } from "./Components.tsx";
  * [x] Collect md files
  *     [ ] collect html files
  *     [ ] collect custom 404 page
+ *     [ ] skip draft pages
  * [ ] Process md files
  *     [x] parse markdown
  *     [x] read frontmatter

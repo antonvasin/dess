@@ -10,6 +10,8 @@ import {
 } from "https://deno.land/std@0.192.0/path/mod.ts";
 import { build, collect, writePage } from "./mod.ts";
 import { bold, combineStyle, green, reset } from "../orchard/console.ts";
+import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
+import { RedBox } from "./Components.tsx";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
 const HMR_CLIENT = `let socket;
@@ -130,6 +132,20 @@ await serve(async (req) => {
     };
 
     return response;
+  }
+
+  try {
+    await Deno.lstat(join(outDir, pathname));
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      console.error("Couldnt find file", join(outDir, pathname));
+      return new Response(renderSSR(h(RedBox, { err: error })), {
+        status: 404,
+        headers: {
+          "content-type": "text/html",
+        },
+      });
+    }
   }
 
   return await serveDir(req, { fsRoot: "./dist" });

@@ -59,3 +59,24 @@ export function PageLink({ page, children, active = false }: LinkProps) {
     </a>
   );
 }
+
+interface ErrorProps {
+  err: Error;
+}
+
+export function RedBox({ err }: ErrorProps) {
+  return (
+    <html>
+      <head />
+      <body>
+        <div
+          className="error"
+          style={{ padding: "24px", backgroundColor: "orangered", borderRadius: "8px" }}
+        >
+          <h1>{err.name}</h1>
+          <pre>{`${err.message}\n\n${err.stack}`}</pre>
+        </div>
+      </body>
+    </html>
+  );
+}
