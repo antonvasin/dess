@@ -3,7 +3,7 @@ import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { resolve } from "https://deno.land/std@0.192.0/path/mod.ts";
-import { collect, LayoutProps, PageLink, writePage } from "./mod.tsx";
+import { collect, copyPublic, LayoutProps, PageLink, writePage } from "./mod.tsx";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
 const HMR_CLIENT = `let socket;
@@ -105,7 +105,11 @@ async function watchForChanges(
   for await (const event of watcher) {
     performance.mark("start-refresh");
     if (event.kind === "modify" || event.kind === "create") {
+      console.log("Event: ", event.kind);
+
       for (const path of event.paths) {
+        console.log(("Event path: ", path));
+
         if (path.endsWith(".md")) {
           try {
             console.info(`File ${path} changed. Building…`);

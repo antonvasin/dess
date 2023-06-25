@@ -105,7 +105,10 @@ export function processMd(
 
   parsed.forEach((token, i, ary) => {
     // Rewrite links
-    if (token.type === "start" && token.tag === "link" && routes.includes(token.url)) {
+    if (
+      token.type === "start" && token.tag === "link" &&
+      routes.includes(token.url)
+    ) {
       token.url = addExt(token.url);
     }
 
@@ -128,12 +131,12 @@ export function processMd(
       );
       const headerContent = renderTokens(parsed.slice(i + 1, tagEndIdx + i));
 
-      const headerAnchorLink = `[<a href="${addExt(page)}#${slugText}">link</a>]`;
+      const headerAnchorLink = `<a class='anchor' href="${addExt(page)}#${slugText}">link</a>`;
 
       const htmlHeader: Token = {
         type: "html",
         content:
-          `<h${token.level} id="${slugText}">${headerContent} ${headerAnchorLink}</h${token.level}>`,
+          `<h${token.level} id="${slugText}">${headerAnchorLink} ${headerContent}</h${token.level}>`,
       };
 
       ary.splice(i, tagEndIdx + 1, htmlHeader);
@@ -175,7 +178,9 @@ export async function renderHtml(
       try {
         LayoutToUse = (await import(frontmatter.layout)).default;
       } catch (err) {
-        console.error(`Couldn't use template ${frontmatter.layout}, using default Layout`);
+        console.error(
+          `Couldn't use template ${frontmatter.layout}, using default Layout`,
+        );
       }
     }
   }
@@ -234,9 +239,11 @@ export async function writePage(
   }
 }
 
-async function copyPublic(srcDir: string, outDir: string) {
+export async function copyPublic(srcDir: string, outDir: string) {
   await ensureDir(join(outDir, publicDir));
-  for await (const file of walk(resolve(srcDir, publicDir), { skip: ignoreNames })) {
+  for await (
+    const file of walk(resolve(srcDir, publicDir), { skip: ignoreNames })
+  ) {
     if (file.isFile) {
       const path = join(outDir, publicDir, basename(file.path));
       if (isDebug) {
@@ -266,10 +273,16 @@ function getPageName(path: string, srcDir: string) {
 export interface LinkProps {
   page: string;
   children?: any;
+  active?: boolean;
 }
 
-export function PageLink({ page, children }: LinkProps) {
-  return <a href={addExt(page, ".html")}>{children}</a>;
+export function PageLink({ page, children, active = false }: LinkProps) {
+  return (
+    // FIXME: empty class attr
+    <a className={active ? "active" : ""} href={addExt(page, ".html")}>
+      {children}
+    </a>
+  );
 }
 
 export interface LayoutProps {
@@ -282,7 +295,9 @@ export interface LayoutProps {
   devScript?: string;
 }
 
-export function DefaultLayout({ html, title = "Title", routes = [] }: LayoutProps) {
+export function DefaultLayout(
+  { html, title = "Title", routes = [] }: LayoutProps,
+) {
   return (
     <html>
       <head>
