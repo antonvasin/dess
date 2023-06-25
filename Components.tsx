@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
+import { h, Helmet } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { addExt, ContentHeading, PostFrontmatter } from "./mod.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -67,12 +67,24 @@ interface ErrorProps {
 export function RedBox({ err }: ErrorProps) {
   return (
     <html>
-      <head />
+      <Helmet>
+        <style>
+          {`body {
+          font-family: sans-serif;
+        }
+        .error {
+          padding: 24px;
+        }
+        .error pre {
+          margin-left: -12px;
+          padding: 24px;
+          border: 2px solid orangered;
+          border-radius: 8px;
+        }`}
+        </style>
+      </Helmet>
       <body>
-        <div
-          className="error"
-          style={{ padding: "24px", backgroundColor: "orangered", borderRadius: "8px" }}
-        >
+        <div className="error">
           <h1>{err.name}</h1>
           <pre>{`${err.message}\n\n${err.stack}`}</pre>
         </div>

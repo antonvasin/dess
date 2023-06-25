@@ -135,18 +135,18 @@ await serve(async (req) => {
   }
 
   try {
-    await Deno.lstat(join(outDir, pathname));
-  } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
-      console.error("Couldnt find file", join(outDir, pathname));
-      return new Response(renderSSR(h(RedBox, { err: error })), {
+    const res = await serveDir(req, { fsRoot: "./dist" });
+    if (res.status === Status.NotFound) {
+      return new Response("Not found (TODO: implement)", {
         status: 404,
-        headers: {
-          "content-type": "text/html",
-        },
+        headers: { "content-type": "text/html" },
       });
     }
+    return res;
+  } catch (error) {
+    return new Response(renderSSR(h(RedBox, { err: error })), {
+      status: 500,
+      headers: { "content-type": "text/html" },
+    });
   }
-
-  return await serveDir(req, { fsRoot: "./dist" });
 }, { port });
