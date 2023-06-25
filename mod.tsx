@@ -323,6 +323,46 @@ export function DefaultLayout(
   );
 }
 
+export interface BuildOpts {
+  srcDir: string;
+  outDir: string;
+  layout: (p: LayoutProps) => any;
+}
+
+export async function build({ srcDir, outDir, layout }: BuildOpts) {
+  performance.mark("build");
+  // const srcDir = args.srcDir as string;
+  // const outDir = args.outDir as string;
+
+  const Layout = layout;
+  console.info(
+    `Building %c${srcDir}%c -> %c${outDir}`,
+    combineStyle(bold, green),
+    reset,
+    combineStyle(bold, green),
+  );
+
+  await emptyDir(outDir);
+  const files = await collect(srcDir);
+
+  for (const file of files) {
+    if (isDebug) {
+      console.debug(
+        `\n\n--> Writing %c${file} %cto %c${outDir}`,
+        combineStyle(bold, blue),
+        reset,
+        combineStyle(bold, green),
+      );
+    }
+    await writePage(file, files, srcDir, outDir, Layout);
+  }
+  await copyPublic(srcDir, outDir);
+
+  performance.mark("build-end");
+  const buildTime = performance.measure("boild-time", "build", "build-end");
+  console.info(`Done in ${formatDuration(buildTime.duration)}!`);
+}
+
 let isDebug = false;
 
 const usage = `Deno Press
@@ -362,16 +402,6 @@ async function main() {
   if (cmd === "help") {
     return printUsage();
   } else if (cmd === "build") {
-    performance.mark("build");
-    const srcDir = args.srcDir as string;
-    const outDir = args.outDir as string;
-
-    console.info(
-      `Building %c${srcDir}%c -> %c${outDir}`,
-      combineStyle(bold, green),
-      reset,
-      combineStyle(bold, green),
-    );
     let LayoutToUse = DefaultLayout;
     if (args.layout) {
       try {
@@ -386,25 +416,9 @@ async function main() {
       }
     }
 
-    await emptyDir(outDir);
-    const files = await collect(srcDir);
-
-    for (const file of files) {
-      if (isDebug) {
-        console.debug(
-          `\n\n--> Writing %c${file} %cto %c${outDir}`,
-          combineStyle(bold, blue),
-          reset,
-          combineStyle(bold, green),
-        );
-      }
-      await writePage(file, files, srcDir, outDir, LayoutToUse);
-    }
-    await copyPublic(srcDir, outDir);
-
-    performance.mark("build-end");
-    const buildTime = performance.measure("boild-time", "build", "build-end");
-    console.info(`Done in ${formatDuration(buildTime.duration)}!`);
+    const srcDir = args.srcDir as string;
+    const outDir = args.outDir as string;
+    await build({ srcDir, outDir, layout: LayoutToUse });
   } else if (cmd === "serve") {
     console.error("Not implemented");
     Deno.exit(1);
