@@ -1,4 +1,4 @@
-import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
+import { h, Helmet } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { DefaultLayout, LayoutProps } from "./Components.tsx";
 
 export function DebugFooter({ page, headings = [], routes = [] }: LayoutProps) {
@@ -32,10 +32,13 @@ export function DebugFooter({ page, headings = [], routes = [] }: LayoutProps) {
 }
 
 export default function DebugLayout(
-  props: LayoutProps,
+  { devScript, ...props }: LayoutProps,
 ) {
   return (
     <DefaultLayout {...props}>
+      <Helmet>
+        {devScript && <script src={devScript} type="module" async />}
+      </Helmet>
       <hr />
       <DebugFooter {...props} />
     </DefaultLayout>

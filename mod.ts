@@ -98,7 +98,12 @@ export function processMd(
   markdown: string,
   routes: string[],
 ): ContentEntry {
-  const parsed = tokens(markdown);
+  const parsed = tokens(markdown, {
+    footnotes: true,
+    tasklists: true,
+    strikethrough: true,
+    tables: true,
+  });
   const headings: ContentHeading[] = [];
 
   if (isDebug) {
