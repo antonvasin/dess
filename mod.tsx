@@ -19,6 +19,7 @@ import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { insertAt } from "../orchard/string.ts";
 import { formatDuration } from "../orchard/time.ts";
 import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.ts";
+import { exists } from "https://deno.land/std@0.192.0/fs/exists.ts";
 
 /*
  * [x] Collect md files
@@ -356,7 +357,9 @@ export async function build({ srcDir, outDir, layout }: BuildOpts) {
     }
     await writePage(file, files, srcDir, outDir, Layout);
   }
-  await copyPublic(srcDir, outDir);
+  if (await exists(join(srcDir, "/public"), { isDirectory: true, isReadable: true })) {
+    await copyPublic(srcDir, outDir);
+  }
 
   performance.mark("build-end");
   const buildTime = performance.measure("boild-time", "build", "build-end");

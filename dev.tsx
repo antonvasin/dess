@@ -2,8 +2,15 @@ import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-import { resolve } from "https://deno.land/std@0.192.0/path/mod.ts";
-import { collect, copyPublic, LayoutProps, PageLink, writePage } from "./mod.tsx";
+import {
+  basename,
+  extname,
+  join,
+  normalize,
+  resolve,
+} from "https://deno.land/std@0.192.0/path/mod.ts";
+import { build, collect, LayoutProps, PageLink, writePage } from "./mod.tsx";
+import { bold, combineStyle, green, reset } from "../orchard/console.ts";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
 const HMR_CLIENT = `let socket;
@@ -96,66 +103,68 @@ function DevLayout(
   );
 }
 
-async function watchForChanges(
-  postsDirectory: string,
-  updateFn: (path?: string) => Promise<unknown>,
-) {
-  await updateFn();
+async function watchForChanges(postsDirectory: string) {
   const watcher = Deno.watchFs(postsDirectory);
+
   for await (const event of watcher) {
-    performance.mark("start-refresh");
-    if (event.kind === "modify" || event.kind === "create") {
-      console.log("Event: ", event.kind);
+    if (!(event.kind === "modify" || event.kind === "create")) continue;
 
-      for (const path of event.paths) {
-        console.log(("Event path: ", path));
+    for (const path of event.paths) {
+      if (path.startsWith(normalize(outDir))) {
+        continue;
+      } else if (extname(path) === ".md") {
+        performance.mark("start-refresh");
 
-        if (path.endsWith(".md")) {
-          try {
-            console.info(`File ${path} changed. Building…`);
-            await updateFn(path);
-            performance.mark("end-refresh");
-            const refreshDur =
-              performance.measure("refresh time", "start-refresh", "end-refresh").duration;
-            console.info(`Refreshed in ${refreshDur.toFixed(2)}ms`);
-            HMR_SOCKETS.forEach((socket) => {
-              socket.send(JSON.stringify({ type: "refresh" }));
-            });
-          } catch (err) {
-            console.error(`${path} error:`, err.message);
-          }
+        try {
+          console.info(`File ${path} changed. Building…`);
+          const Layout = layout
+            ? (await import(resolve(Deno.cwd(), layout as string))).default
+            : DevLayout;
+          const files = await collect(srcDir);
+          const devScript = "/hmr.js";
+
+          await writePage(path, files, srcDir, outDir, Layout, devScript);
+          performance.mark("end-refresh");
+          const refreshDur = performance.measure("refresh time", "start-refresh", "end-refresh");
+          console.info(`Refreshed in ${refreshDur.duration.toFixed(2)}ms`);
+          HMR_SOCKETS.forEach((socket) => {
+            socket.send(JSON.stringify({ type: "refresh" }));
+          });
+        } catch (err) {
+          console.error(`${path} error:`, err.message);
         }
+      } else if (path.includes("/public")) {
+        console.info(
+          `Public file %c${basename(path)}%c changed…`,
+          combineStyle(green, bold),
+          reset,
+        );
+        // XXX: Deno.copyFile modifies source file resulting in infinite loop https://github.com/denoland/deno/issues/19425
+        // await Deno.copyFile(path, join(outDir, "/public", basename(path)));
+        await Deno.writeFile(join(outDir, "/public", basename(path)), Deno.readFileSync(path));
       }
     }
   }
 }
 
 const args = parse(Deno.args, {
-  string: ["srcDir, outDir", "layout"],
+  string: ["srcDir, outDir", "layout", "port"],
   boolean: ["debug"],
   default: {
     srcDir: "./",
     outDir: "./dist",
+    port: "3000",
   },
 });
 
-const srcDir = args.srcDir as string;
-const outDir = args.outDir as string;
+const srcDir = normalize(String(args.srcDir));
+const outDir = normalize(String(args.outDir));
+const port = Number(args.port);
 const layout = args.layout;
 
-watchForChanges(srcDir, async (path) => {
-  const Layout = layout ? (await import(resolve(Deno.cwd(), layout as string))).default : DevLayout;
-  const files = await collect(srcDir);
-  const devScript = "/hmr.js";
-
-  if (!path) {
-    return files.forEach(async (file) =>
-      await writePage(file, files, srcDir, outDir, Layout, devScript)
-    );
-  }
-
-  await writePage(path, files, srcDir, outDir, Layout, devScript);
-}).catch(console.error);
+const Layout = layout ? (await import(resolve(Deno.cwd(), layout as string))).default : DevLayout;
+await build({ srcDir, outDir, layout: Layout });
+watchForChanges(srcDir).catch(console.error);
 
 await serve(async (req) => {
   const { pathname } = new URL(req.url);
@@ -178,4 +187,4 @@ await serve(async (req) => {
   }
 
   return await serveDir(req, { fsRoot: "./dist" });
-}, { port: 3000 });
+}, { port });
