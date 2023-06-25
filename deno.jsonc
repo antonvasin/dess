@@ -1,8 +1,8 @@
 {
   "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
   "tasks": {
-    "test-build": "deno run --allow-read --allow-write mod.ts build --srcDir=./test  --outDir=./dist",
-    "serve": "deno run --allow-read=./dist --allow-net https://deno.land/std/http/file_server.ts -p 3000 ./dist",
+    "test-build": "deno run --allow-read --allow-write --allow-sys mod.ts build --srcDir=./test  --outDir=./dist",
+    "serve": "deno run --allow-read=./dist --allow-net mod.ts serve -p 3000 --outDir=dist",
     "dev": "deno run -A --watch dev.ts --srcDir=test --layout=DebugLayout.tsx"
   },
   "fmt": {

@@ -12,6 +12,7 @@ import { build, collect, writePage } from "./mod.ts";
 import { bold, combineStyle, green, reset } from "../orchard/console.ts";
 import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { RedBox } from "./Components.tsx";
+import { Status } from "https://deno.land/std@0.192.0/http/http_status.ts";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
 const HMR_CLIENT = `let socket;

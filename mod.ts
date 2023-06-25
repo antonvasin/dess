@@ -20,7 +20,10 @@ import { insertAt } from "../orchard/string.ts";
 import { formatDuration } from "../orchard/time.ts";
 import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.ts";
 import { exists } from "https://deno.land/std@0.192.0/fs/exists.ts";
+import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
+import { serve as _serve, ServeInit } from "https://deno.land/std@0.192.0/http/server.ts";
 import { DefaultLayout, LayoutComponent } from "./Components.tsx";
+import { Status } from "https://deno.land/std@0.192.0/http/http_status.ts";
 
 /*
  * [x] Collect md files
@@ -55,9 +58,7 @@ import { DefaultLayout, LayoutComponent } from "./Components.tsx";
  */
 
 const extensions = [".md"];
-
 const publicDir = "public";
-
 const ignoreNames = [
   /readme/i,
   /license/i,
@@ -311,11 +312,23 @@ export async function build({ srcDir, outDir, layout }: BuildOpts) {
     await writePage(file, files, srcDir, outDir, Layout);
   }
 
-  if (await exists(join(srcDir, "/public"), { isDirectory: true, isReadable: true })) {
+  if (await exists(join(srcDir, publicDir), { isDirectory: true, isReadable: true })) {
     await copyPublic(srcDir, outDir);
   }
 
   performance.mark("build-end");
+}
+
+function serve(dir: string, opts?: ServeInit) {
+  _serve(async (req) => {
+    const res = await serveDir(req, { fsRoot: dir });
+    return res.status === Status.NotFound
+      ? new Response("Not found (TODO: implement)", {
+        status: 404,
+        headers: { "content-type": "text/html" },
+      })
+      : res;
+  }, opts);
 }
 
 let isDebug = false;
@@ -328,9 +341,11 @@ const usage = `Deno Press
     help      Print this message
     build     Build static website
     serve     Run SSR server
+    dev       Run dev server
   OPTIONS:
     --srcDir  Source directory with .md files (default: ./)
     --outDir  Destination directory (default: ./dist)
+    --port    Server port to use
     --debug   Print debug information`;
 
 async function main() {
@@ -340,9 +355,13 @@ async function main() {
     default: {
       srcDir: "./",
       outDir: "./dist",
+      port: "3000",
     },
   });
   isDebug = Boolean(args.debug);
+  const srcDir = String(args.srcDir);
+  const outDir = String(args.outDir);
+  const port = Number(args.port);
   const [cmd] = args._;
 
   const printUsage = () => {
@@ -371,14 +390,13 @@ async function main() {
       }
     }
 
-    const srcDir = args.srcDir as string;
-    const outDir = args.outDir as string;
     await build({ srcDir, outDir, layout: LayoutToUse });
     const buildTime = performance.measure("boild-time", "build", "build-end");
     console.info(`Done in ${formatDuration(buildTime.duration)}!`);
   } else if (cmd === "serve") {
-    console.error("Not implemented");
-    Deno.exit(1);
+    serve(outDir, { port });
+  } else if (cmd === "dev") {
+    throw new Error("Not implemented");
   }
 }
 
