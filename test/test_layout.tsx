@@ -1,5 +1,5 @@
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
-import { LayoutProps } from "../mod.tsx";
+import { LayoutProps } from "../mod.ts";
 
 export default function TestLayout({ html }: LayoutProps) {
   return (

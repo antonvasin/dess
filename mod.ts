@@ -20,6 +20,7 @@ import { insertAt } from "../orchard/string.ts";
 import { formatDuration } from "../orchard/time.ts";
 import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.ts";
 import { exists } from "https://deno.land/std@0.192.0/fs/exists.ts";
+import { DefaultLayout, LayoutComponent } from "./Components.tsx";
 
 /*
  * [x] Collect md files
@@ -74,19 +75,19 @@ export async function collect(dir: string) {
   return posts;
 }
 
-interface PostFrontmatter extends Record<string, unknown> {
+export interface PostFrontmatter extends Record<string, unknown> {
   layout?: string;
   title?: string;
   slug?: string;
   date?: string;
 }
 
-interface ContentHeading {
+export interface ContentHeading {
   slug: string;
   text: string;
 }
 
-interface ContentEntry {
+export interface ContentEntry {
   tokens: Token[];
   headings?: ContentHeading[];
 }
@@ -155,7 +156,7 @@ export function processMd(
 }
 
 interface RenderOpts {
-  layout?: (props: LayoutProps) => any;
+  layout?: LayoutComponent;
   frontmatter?: PostFrontmatter;
   routes?: string[];
   devScript?: string;
@@ -181,6 +182,7 @@ export async function renderHtml(
       } catch (err) {
         console.error(
           `Couldn't use template ${frontmatter.layout}, using default Layout`,
+          err,
         );
       }
     }
@@ -195,14 +197,14 @@ export async function renderHtml(
   }
 
   const rendered = renderSSR(() => (
-    <LayoutToUse
-      routes={routes}
-      html={renderTokens(tokens)}
-      frontmatter={frontmatter}
-      page={page}
-      headings={headings}
-      devScript={opts.devScript}
-    />
+    h(LayoutToUse, {
+      routes,
+      html: renderTokens(tokens),
+      frontmatter,
+      page,
+      headings,
+      devScript: opts.devScript,
+    })
   ));
   return rendered;
 }
@@ -259,7 +261,7 @@ export async function copyPublic(srcDir: string, outDir: string) {
   }
 }
 
-function addExt(str: string, ext = ".html") {
+export function addExt(str: string, ext = ".html") {
   return str.includes("#")
     ? insertAt(str, str.indexOf("#"), ext)
     : str.includes("?")
@@ -271,69 +273,14 @@ function getPageName(path: string, srcDir: string) {
   return "/" + relative(srcDir, path).replace(/\.(md|MD)$/, "");
 }
 
-export interface LinkProps {
-  page: string;
-  children?: any;
-  active?: boolean;
-}
-
-export function PageLink({ page, children, active = false }: LinkProps) {
-  return (
-    // FIXME: empty class attr
-    <a className={active ? "active" : ""} href={addExt(page, ".html")}>
-      {children}
-    </a>
-  );
-}
-
-export interface LayoutProps {
-  html: string;
-  title?: string;
-  page: string;
-  routes?: string[];
-  headings?: ContentHeading[];
-  frontmatter?: PostFrontmatter;
-  devScript?: string;
-}
-
-export function DefaultLayout(
-  { html, title = "Title", routes = [] }: LayoutProps,
-) {
-  return (
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        {title && <title>{title}</title>}
-      </head>
-      <body>
-        <header>
-          {title && <h1>{title}</h1>}
-          <nav>
-            <ul>
-              {routes.map((route) => (
-                <li>
-                  <PageLink page={route}>{route}</PageLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </header>
-        <main innerHTML={{ __dangerousHtml: html }} />
-      </body>
-    </html>
-  );
-}
-
 export interface BuildOpts {
   srcDir: string;
   outDir: string;
-  layout: (p: LayoutProps) => any;
+  layout: LayoutComponent;
 }
 
 export async function build({ srcDir, outDir, layout }: BuildOpts) {
   performance.mark("build");
-  // const srcDir = args.srcDir as string;
-  // const outDir = args.outDir as string;
 
   const Layout = layout;
   console.info(
@@ -357,13 +304,12 @@ export async function build({ srcDir, outDir, layout }: BuildOpts) {
     }
     await writePage(file, files, srcDir, outDir, Layout);
   }
+
   if (await exists(join(srcDir, "/public"), { isDirectory: true, isReadable: true })) {
     await copyPublic(srcDir, outDir);
   }
 
   performance.mark("build-end");
-  const buildTime = performance.measure("boild-time", "build", "build-end");
-  console.info(`Done in ${formatDuration(buildTime.duration)}!`);
 }
 
 let isDebug = false;
@@ -422,6 +368,8 @@ async function main() {
     const srcDir = args.srcDir as string;
     const outDir = args.outDir as string;
     await build({ srcDir, outDir, layout: LayoutToUse });
+    const buildTime = performance.measure("boild-time", "build", "build-end");
+    console.info(`Done in ${formatDuration(buildTime.duration)}!`);
   } else if (cmd === "serve") {
     console.error("Not implemented");
     Deno.exit(1);

@@ -1,5 +1,4 @@
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
-import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import {
@@ -9,7 +8,7 @@ import {
   normalize,
   resolve,
 } from "https://deno.land/std@0.192.0/path/mod.ts";
-import { build, collect, LayoutProps, PageLink, writePage } from "./mod.tsx";
+import { build, collect, writePage } from "./mod.ts";
 import { bold, combineStyle, green, reset } from "../orchard/console.ts";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
@@ -50,59 +49,6 @@ function hmrSocket(callback) {
 }
 `;
 
-function DevLayout(
-  { html, title = "Dev Blog Title", routes = [], page, headings = [] }: LayoutProps,
-) {
-  return (
-    <html>
-      <head>
-        <script src="/hmr.js" type="module" async />
-      </head>
-      <body>
-        <header>
-          {title && <h1>{title}</h1>}
-          <nav>
-            <ul>
-              {routes.map((route) => (
-                <li>
-                  <PageLink page={route}>{route}</PageLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </header>
-        <main innerHTML={{ __dangerousHtml: html }} />
-        <hr />
-        <footer>
-          <dl>
-            <dt>Page name</dt>
-            <dd>
-              <pre>{page}</pre>
-            </dd>
-
-            <dt>Current page headings</dt>
-            <dd>
-              <dl>
-                {headings.map((heading) => (
-                  <div>
-                    <dt>{heading.text}</dt>
-                    <dd>
-                      <pre>{heading.slug}</pre>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </dd>
-
-            <dt>Page count</dt>
-            <dd>{routes.length}</dd>
-          </dl>
-        </footer>
-      </body>
-    </html>
-  );
-}
-
 async function watchForChanges(postsDirectory: string) {
   const watcher = Deno.watchFs(postsDirectory);
 
@@ -119,7 +65,7 @@ async function watchForChanges(postsDirectory: string) {
           console.info(`File ${path} changed. Building…`);
           const Layout = layout
             ? (await import(resolve(Deno.cwd(), layout as string))).default
-            : DevLayout;
+            : undefined;
           const files = await collect(srcDir);
           const devScript = "/hmr.js";
 
@@ -162,7 +108,7 @@ const outDir = normalize(String(args.outDir));
 const port = Number(args.port);
 const layout = args.layout;
 
-const Layout = layout ? (await import(resolve(Deno.cwd(), layout as string))).default : DevLayout;
+const Layout = layout ? (await import(resolve(Deno.cwd(), layout as string))).default : undefined;
 await build({ srcDir, outDir, layout: Layout });
 watchForChanges(srcDir).catch(console.error);
 
