@@ -1,5 +1,4 @@
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
-import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import {
   basename,
@@ -8,11 +7,11 @@ import {
   normalize,
   resolve,
 } from "https://deno.land/std@0.192.0/path/mod.ts";
-import { build, collect, writePage } from "./mod.ts";
 import { bold, combineStyle, green, reset } from "../orchard/console.ts";
 import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
+
+import { build, collect, handler, writePage } from "./mod.ts";
 import { RedBox } from "./Components.tsx";
-import { Status } from "https://deno.land/std@0.192.0/http/http_status.ts";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
 const HMR_CLIENT = `let socket;
@@ -115,35 +114,28 @@ const Layout = layout ? (await import(resolve(Deno.cwd(), layout as string))).de
 await build({ srcDir, outDir, layout: Layout });
 watchForChanges(srcDir).catch(console.error);
 
-await serve(async (req) => {
-  const { pathname } = new URL(req.url);
-  if (pathname == "/hmr.js") {
-    return new Response(HMR_CLIENT, {
-      headers: {
-        "content-type": "application/javascript",
-      },
-    });
-  }
-
-  if (pathname == "/hmr") {
-    const { response, socket } = Deno.upgradeWebSocket(req);
-    HMR_SOCKETS.add(socket);
-    socket.onclose = () => {
-      HMR_SOCKETS.delete(socket);
-    };
-
-    return response;
-  }
-
+await serve((req) => {
   try {
-    const res = await serveDir(req, { fsRoot: "./dist" });
-    if (res.status === Status.NotFound) {
-      return new Response("Not found (TODO: implement)", {
-        status: 404,
-        headers: { "content-type": "text/html" },
+    const { pathname } = new URL(req.url);
+    if (pathname == "/hmr.js") {
+      return new Response(HMR_CLIENT, {
+        headers: {
+          "content-type": "application/javascript",
+        },
       });
     }
-    return res;
+
+    if (pathname == "/hmr") {
+      const { response, socket } = Deno.upgradeWebSocket(req);
+      HMR_SOCKETS.add(socket);
+      socket.onclose = () => {
+        HMR_SOCKETS.delete(socket);
+      };
+
+      return response;
+    }
+
+    return handler(req, outDir);
   } catch (error) {
     return new Response(renderSSR(h(RedBox, { err: error })), {
       status: 500,
