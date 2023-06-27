@@ -1,6 +1,7 @@
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { assert } from "https://deno.land/std@0.192.0/testing/asserts.ts";
-import { LayoutProps, renderHtml } from "./mod.tsx";
+import { renderHtml } from "./mod.ts";
+import { LayoutProps } from "./Components.tsx";
 
 Deno.test("renderHtml", async () => {
   const pageContent = `# page without frontmatter
@@ -11,8 +12,9 @@ Deno.test("renderHtml", async () => {
 
   assert(
     html.includes(
-      `<h1 id="page-without-frontmatter">page without frontmatter <a href="//page.html#page-without-frontmatter">[link]</a></h1>`,
+      `<h1 id="page-without-frontmatter"><a class='anchor' href="/page.html#page-without-frontmatter">link</a> page without frontmatter</h1>`,
     ),
+    "Should include heading with id and self-referencing link",
   );
 
   const MyLayout = (props: LayoutProps) => (
@@ -26,6 +28,9 @@ Deno.test("renderHtml", async () => {
 
   const htmlCustomLayout = await renderHtml("/page", pageContent, { layout: MyLayout });
 
-  assert(htmlCustomLayout.includes("<h1>My Custom Layout</h1"));
-  assert(htmlCustomLayout.includes("hello world!"));
+  assert(
+    htmlCustomLayout.includes("<h1>My Custom Layout</h1"),
+    "Should include header from custom layout",
+  );
+  assert(htmlCustomLayout.includes("hello world!"), "Should include content");
 });
