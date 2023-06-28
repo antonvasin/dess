@@ -1,7 +1,15 @@
 import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
-import { assert } from "https://deno.land/std@0.192.0/testing/asserts.ts";
+import {
+  assert,
+  assertEquals,
+  assertMatch,
+} from "https://deno.land/std@0.192.0/testing/asserts.ts";
+import { emptyDir, exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
+
 import { renderHtml } from "./mod.ts";
 import { LayoutProps } from "./Components.tsx";
+
+const outDir = "dist";
 
 Deno.test("renderHtml", async () => {
   const pageContent = `# page without frontmatter
@@ -34,3 +42,33 @@ Deno.test("renderHtml", async () => {
   );
   assert(htmlCustomLayout.includes("hello world!"), "Should include content");
 });
+
+Deno.test(
+  "E2E",
+  async (t) => {
+    await t.step("build", async () => {
+      await emptyDir(outDir);
+
+      const cmd = new Deno.Command(Deno.execPath(), {
+        args: [
+          "run",
+          "--allow-read",
+          "--allow-write",
+          "--allow-sys",
+          "mod.ts",
+          "build",
+          "--srcDir=test",
+          `--outDir=${outDir}`,
+        ],
+      });
+
+      const { code, stdout } = await cmd.output();
+      const decoder = new TextDecoder();
+
+      assertEquals(code, 0, "Non-zero exit code");
+      assertMatch(decoder.decode(stdout), /^Done in \d+ms!$/m);
+      assert(await exists(`${outDir}/hello.html`, { isFile: true }));
+      assert(await exists(`${outDir}/blog`, { isDirectory: true }));
+    });
+  },
+);
