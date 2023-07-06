@@ -51,8 +51,6 @@ function hmrSocket(callback) {
 }
 `;
 
-const devScriptPath = "/hmr.js";
-
 async function watchForChanges(postsDirectory: string) {
   const watcher = Deno.watchFs(postsDirectory);
 

@@ -14,7 +14,7 @@ import {
   tokens,
 } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
 import { slug } from "https://deno.land/x/slug@v1.1.0/mod.ts";
-import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
+import { h, Helmet, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { insertAt } from "../orchard/string.ts";
 import { formatDuration } from "../orchard/time.ts";
 import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.ts";
@@ -165,7 +165,6 @@ interface RenderOpts {
   layout?: LayoutComponent;
   frontmatter?: PostFrontmatter;
   routes?: string[];
-  devScript?: string;
 }
 
 export async function importLayout(path: string, fallback?: (props: any) => any) {
@@ -208,17 +207,28 @@ export async function renderHtml(
     );
   }
 
-  const rendered = renderSSR(() => (
+  const rendered = renderSSR(
     h(LayoutToUse, {
       routes,
       html: renderTokens(tokens),
       frontmatter,
       page,
       headings,
-      devScript: opts.devScript,
-    })
-  ));
-  return rendered;
+    }),
+  );
+  const { head, body, footer, attributes } = Helmet.SSR(rendered);
+  return `<!DOCTYPE html>
+  <html ${attributes.html.toString()}>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      ${head.join("\n")}
+    </head>
+    <body ${attributes.body.toString()}>
+    ${body}
+    ${footer.join("\n")}
+  </body>
+</html>`;
 }
 
 export async function writePage(
@@ -227,14 +237,13 @@ export async function writePage(
   srcDir = ".",
   outDir = "./dist",
   layout = DefaultLayout,
-  devScript?: string,
 ) {
   const page = getPageName(path, srcDir);
   const routes = files.map((f) => getPageName(f, srcDir));
 
   try {
     let content = await Deno.readTextFile(path);
-    const opts: RenderOpts = { routes, layout, devScript };
+    const opts: RenderOpts = { routes, layout };
 
     if (test(content)) {
       const { attrs, body } = extract(content);

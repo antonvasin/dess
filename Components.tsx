@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import { h, Helmet } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
+import { Fragment, h, Helmet } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { addExt, ContentHeading, PostFrontmatter } from "./mod.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -12,7 +12,6 @@ export interface LayoutProps {
   routes?: string[];
   headings?: ContentHeading[];
   frontmatter?: PostFrontmatter;
-  devScript?: string;
   children?: any;
 }
 
@@ -26,28 +25,25 @@ export function DefaultLayout(
   { html, title = "Title", routes = [], children }: LayoutProps,
 ) {
   return (
-    <html>
-      <head>
-        <meta charset="utf-8" />
+    <>
+      <Helmet>
         {title && <title>{title}</title>}
-      </head>
-      <body>
-        <header>
-          {title && <h1>{title}</h1>}
-          <nav>
-            <ul>
-              {routes.map((route) => (
-                <li>
-                  <PageLink page={route}>{route}</PageLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </header>
-        <main innerHTML={{ __dangerousHtml: html }} />
-        {children}
-      </body>
-    </html>
+      </Helmet>
+      <header>
+        {title && <h1>{title}</h1>}
+        <nav>
+          <ul>
+            {routes.map((route) => (
+              <li>
+                <PageLink page={route}>{route}</PageLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </header>
+      <main innerHTML={{ __dangerousHtml: html }} />
+      {children}
+    </>
   );
 }
 

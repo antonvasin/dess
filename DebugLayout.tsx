@@ -1,12 +1,9 @@
 import { h, Helmet } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
-import { DefaultLayout, LayoutProps } from "./Components.tsx";
+import { DefaultLayout, LayoutComponent, LayoutProps } from "./Components.tsx";
 
-export function DebugFooter({ page, headings = [], routes = [], devScript }: LayoutProps) {
+export function DebugFooter({ page, headings = [], routes = [] }: LayoutProps) {
   return (
     <footer>
-      HMR is {devScript
-        ? <span style={{ color: "green" }}>on</span>
-        : <span style={{ color: "red" }}>off</span>}
       <dl>
         <dt>Page name</dt>
         <dd>
@@ -34,13 +31,24 @@ export function DebugFooter({ page, headings = [], routes = [], devScript }: Lay
   );
 }
 
-export default function DebugLayout(
-  { devScript, ...props }: LayoutProps,
-) {
+export function wrapWithHmr(layout: LayoutComponent): LayoutComponent {
+  const Layout = layout;
+  return (props) => {
+    return (
+      <Layout {...props}>
+        <Helmet>
+          <script src="/hmr.js" type="module" async />
+        </Helmet>
+      </Layout>
+    );
+  };
+}
+
+export default function DebugLayout(props: LayoutProps) {
   return (
     <DefaultLayout {...props}>
       <Helmet>
-        {devScript && <script src={devScript} type="module" async />}
+        <script src="/hmr.js" type="module" async />
       </Helmet>
       <hr />
       <DebugFooter {...props} />
