@@ -7,6 +7,8 @@ import {
   relative,
   resolve,
 } from "https://deno.land/std@0.192.0/path/mod.ts";
+import { bundle } from "https://deno.land/x/emit/mod.ts";
+import { load } from "https://deno.land/x/eszip/loader.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
 import {
   html as renderTokens,
@@ -45,10 +47,16 @@ export async function collect(dir: string) {
 }
 
 export interface PostFrontmatter extends Record<string, unknown> {
+  /** Path to custom lalyout */
   layout?: string;
+  /** Custom page title */
   title?: string;
+  /** Custom page slug */
   slug?: string;
+  /** Publish date */
   date?: string;
+  /** Custom js path */
+  js?: string;
 }
 
 export interface ContentHeading {
@@ -164,6 +172,11 @@ export async function renderHtml(
   if (frontmatter) {
     if (frontmatter.layout) {
       LayoutToUse = await importLayout(frontmatter.layout, layout);
+    }
+
+    if (frontmatter.js) {
+      const jsBundle = await bundle(new URL(frontmatter.js, import.meta.url), { load });
+      console.debug("jsBundle", jsBundle.code);
     }
   }
 
