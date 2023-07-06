@@ -1,4 +1,3 @@
-// deno-lint-ignore-file no-explicit-any
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
 import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
 import {
@@ -15,7 +14,7 @@ import {
   tokens,
 } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
 import { slug } from "https://deno.land/x/slug@v1.1.0/mod.ts";
-import { h, Helmet, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
+import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { insertAt } from "../orchard/string.ts";
 import { formatDuration } from "../orchard/time.ts";
 import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.ts";
