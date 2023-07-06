@@ -51,6 +51,8 @@ function hmrSocket(callback) {
 }
 `;
 
+const devScriptPath = "/hmr.js";
+
 async function watchForChanges(postsDirectory: string) {
   const watcher = Deno.watchFs(postsDirectory);
 
@@ -58,7 +60,7 @@ async function watchForChanges(postsDirectory: string) {
     if (!(event.kind === "modify" || event.kind === "create")) continue;
 
     for (const path of event.paths) {
-      if (path.startsWith(normalize(outDir))) {
+      if (path.startsWith(resolve(outDir))) {
         continue;
       } else if (extname(path) === ".md") {
         performance.mark("start-refresh");
@@ -67,9 +69,8 @@ async function watchForChanges(postsDirectory: string) {
           console.info(`File ${path} changed. Building…`);
           const Layout = await importLayout(resolve(Deno.cwd(), layout as string));
           const files = await collect(srcDir);
-          const devScript = "/hmr.js";
 
-          await writePage(path, files, srcDir, outDir, Layout, devScript);
+          await writePage(path, files, srcDir, outDir, Layout);
           performance.mark("end-refresh");
           const refreshDur = performance.measure("refresh time", "start-refresh", "end-refresh");
           console.info(`Refreshed in ${refreshDur.duration.toFixed(2)}ms`);
@@ -80,8 +81,12 @@ async function watchForChanges(postsDirectory: string) {
           console.error(`${path} error:`, err.message);
         }
       } else if (path.includes("/public")) {
+        if ((await Deno.stat(path)).isDirectory) {
+          continue;
+        }
+
         console.info(
-          `Public file %c${basename(path)}%c changed…`,
+          `Public file %c${path}%c changed…`,
           combineStyle(green, bold),
           reset,
         );
