@@ -11,7 +11,7 @@ import { bold, combineStyle, green, reset } from "../orchard/console.ts";
 import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 
 import { build, collect, handler, importLayout, writePage } from "./mod.ts";
-import { RedBox } from "./Components.tsx";
+import { DefaultLayout, RedBox, wrapWithHmr } from "./Components.tsx";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
 const HMR_CLIENT = `let socket;
@@ -65,10 +65,14 @@ async function watchForChanges(postsDirectory: string) {
 
         try {
           console.info(`File ${path} changed. Building…`);
-          const Layout = await importLayout(resolve(Deno.cwd(), layout as string));
+          const Layout = layoutPath
+            ? await importLayout(
+              resolve(Deno.cwd(), layoutPath as string),
+            )
+            : DefaultLayout;
           const files = await collect(srcDir);
 
-          await writePage(path, files, srcDir, outDir, Layout);
+          await writePage(path, files, srcDir, outDir, wrapWithHmr(Layout));
           performance.mark("end-refresh");
           const refreshDur = performance.measure("refresh time", "start-refresh", "end-refresh");
           console.info(`Refreshed in ${refreshDur.duration.toFixed(2)}ms`);
@@ -76,7 +80,7 @@ async function watchForChanges(postsDirectory: string) {
             socket.send(JSON.stringify({ type: "refresh" }));
           });
         } catch (err) {
-          console.error(`${path} error:`, err.message);
+          console.error(`${path} error:`, err);
         }
       } else if (path.includes("/public")) {
         if ((await Deno.stat(path)).isDirectory) {
@@ -109,10 +113,12 @@ const args = parse(Deno.args, {
 const srcDir = normalize(String(args.srcDir));
 const outDir = normalize(String(args.outDir));
 const port = Number(args.port);
-const layout = args.layout;
+const layoutPath = args.layout;
 
-const Layout = layout ? (await import(resolve(Deno.cwd(), layout as string))).default : undefined;
-await build({ srcDir, outDir, layout: Layout });
+const layout = layoutPath
+  ? (await import(resolve(Deno.cwd(), layoutPath as string))).default
+  : DefaultLayout;
+await build({ srcDir, outDir, layout: wrapWithHmr(layout) });
 watchForChanges(srcDir).catch(console.error);
 
 await serve((req) => {
