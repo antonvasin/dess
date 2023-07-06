@@ -1,9 +1,12 @@
 import { h, Helmet } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { DefaultLayout, LayoutProps } from "./Components.tsx";
 
-export function DebugFooter({ page, headings = [], routes = [] }: LayoutProps) {
+export function DebugFooter({ page, headings = [], routes = [], devScript }: LayoutProps) {
   return (
     <footer>
+      HMR is {devScript
+        ? <span style={{ color: "green" }}>on</span>
+        : <span style={{ color: "red" }}>off</span>}
       <dl>
         <dt>Page name</dt>
         <dd>

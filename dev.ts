@@ -10,7 +10,7 @@ import {
 import { bold, combineStyle, green, reset } from "../orchard/console.ts";
 import { h, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 
-import { build, collect, handler, writePage } from "./mod.ts";
+import { build, collect, handler, importLayout, writePage } from "./mod.ts";
 import { RedBox } from "./Components.tsx";
 
 const HMR_SOCKETS: Set<WebSocket> = new Set();
@@ -65,9 +65,7 @@ async function watchForChanges(postsDirectory: string) {
 
         try {
           console.info(`File ${path} changed. Building…`);
-          const Layout = layout
-            ? (await import(resolve(Deno.cwd(), layout as string))).default
-            : undefined;
+          const Layout = await importLayout(resolve(Deno.cwd(), layout as string));
           const files = await collect(srcDir);
           const devScript = "/hmr.js";
 

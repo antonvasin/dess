@@ -168,6 +168,19 @@ interface RenderOpts {
   devScript?: string;
 }
 
+export async function importLayout(path: string, fallback?: (props: any) => any) {
+  try {
+    return (await import(path)).default || fallback;
+  } catch (err) {
+    console.error(
+      `Couldn't load layout %c${path}. %cUsing ${fallback?.name} instead.\nFailed with %c${err.message}`,
+      bold,
+      reset,
+      red,
+    );
+  }
+}
+
 export async function renderHtml(
   page: string,
   content: string,
@@ -183,14 +196,7 @@ export async function renderHtml(
 
   if (frontmatter) {
     if (frontmatter.layout) {
-      try {
-        LayoutToUse = (await import(frontmatter.layout)).default;
-      } catch (err) {
-        console.error(
-          `Couldn't use template ${frontmatter.layout}, using default Layout`,
-          err,
-        );
-      }
+      LayoutToUse = await importLayout(frontmatter.layout, layout);
     }
   }
 
@@ -383,16 +389,7 @@ async function main() {
   } else if (cmd === "build") {
     let LayoutToUse = DefaultLayout;
     if (args.layout) {
-      try {
-        LayoutToUse = (await import(resolve(Deno.cwd(), args.layout))).default;
-      } catch (err) {
-        console.error(
-          `Couldn't load layout %c${args.layout}. %cUsing default layout instead.\nFailed with %c${err.message}`,
-          bold,
-          reset,
-          red,
-        );
-      }
+      LayoutToUse = await importLayout(resolve(Deno.cwd(), args.layout), DefaultLayout);
     }
 
     await build({ srcDir, outDir, layout: LayoutToUse });
