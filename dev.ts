@@ -83,18 +83,29 @@ async function watchForChanges(postsDirectory: string) {
           console.error(`${path} error:`, err);
         }
       } else if (path.includes("/public")) {
-        if ((await Deno.stat(path)).isDirectory) {
-          continue;
-        }
+        try {
+          const file = await Deno.stat(path);
+          if (file.isDirectory) {
+            continue;
+          }
 
-        console.info(
-          `Public file %c${path}%c changed…`,
-          combineStyle(green, bold),
-          reset,
-        );
-        // XXX: Deno.copyFile modifies source file resulting in infinite loop https://github.com/denoland/deno/issues/19425
-        // await Deno.copyFile(path, join(outDir, "/public", basename(path)));
-        await Deno.writeFile(join(outDir, "/public", basename(path)), Deno.readFileSync(path));
+          console.info(
+            `Public file %c${path}%c changed…`,
+            combineStyle(green, bold),
+            reset,
+          );
+          // XXX: Deno.copyFile modifies source file resulting in infinite loop https://github.com/denoland/deno/issues/19425
+          // await Deno.copyFile(path, join(outDir, "/public", basename(path)));
+          await Deno.writeFile(join(outDir, "/public", basename(path)), Deno.readFileSync(path));
+          HMR_SOCKETS.forEach((socket) => {
+            socket.send(JSON.stringify({ type: "refresh" }));
+          });
+        } catch (err) {
+          if (err instanceof Deno.errors.NotFound) {
+            continue;
+          }
+          throw err;
+        }
       }
     }
   }
