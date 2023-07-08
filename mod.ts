@@ -7,8 +7,6 @@ import {
   relative,
   resolve,
 } from "https://deno.land/std@0.192.0/path/mod.ts";
-import { bundle } from "https://deno.land/x/emit/mod.ts";
-import { load } from "https://deno.land/x/eszip/loader.ts";
 import { extract, test } from "https://deno.land/std@0.192.0/front_matter/any.ts";
 import {
   html as renderTokens,
@@ -139,7 +137,6 @@ export function processMd(
 
 interface RenderOpts {
   layout?: LayoutComponent;
-  frontmatter?: PostFrontmatter;
   routes?: string[];
 }
 
@@ -161,10 +158,18 @@ export async function renderHtml(
   content: string,
   opts: RenderOpts = {},
 ): Promise<string> {
-  const { layout = DefaultLayout, routes = [], frontmatter } = opts;
+  const { layout = DefaultLayout, routes = [] } = opts;
+  let input = content;
+  let frontmatter: PostFrontmatter = {};
+  if (test(content)) {
+    const { attrs, body } = extract(content);
+    input = body;
+    frontmatter = attrs;
+  }
+
   const { tokens, headings } = processMd(
     page,
-    content,
+    input,
     routes,
   );
   let LayoutToUse = layout;
@@ -238,14 +243,8 @@ export async function writePage(
   const routes = files.map((f) => getPageName(f, srcDir));
 
   try {
-    let content = await Deno.readTextFile(path);
+    const content = await Deno.readTextFile(path);
     const opts: RenderOpts = { routes, layout };
-
-    if (test(content)) {
-      const { attrs, body } = extract(content);
-      content = body;
-      opts.frontmatter = attrs;
-    }
 
     const html = await renderHtml(page, content, opts);
 

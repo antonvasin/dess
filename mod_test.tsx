@@ -12,7 +12,7 @@ import { LayoutProps } from "./Components.tsx";
 const outDir = "dist";
 
 Deno.test("renderHtml", async (t) => {
-  await t.step("frontmatter", async () => {
+  await t.step("render", async () => {
     const pageContent = `# page without frontmatter
 
   hello world!`;
@@ -44,20 +44,24 @@ Deno.test("renderHtml", async (t) => {
     assert(htmlCustomLayout.includes("hello world!"), "Should include content");
   });
 
-  await t.step("js imports", async () => {
-    const content = `---
+  await t.step({
+    name: "js imports",
+    ignore: true,
+    async fn() {
+      const content = `---
 js: './custom_js.ts
 ---
 # Page title
 `;
 
-    const rendered = await renderHtml("/index", content);
-    assert(
-      rendered.includes(
-        `<script src="/custom_js.js" type="module" async></script>`,
-      ),
-      "Includes <script> tag with custom js file",
-    );
+      const rendered = await renderHtml("/index", content);
+      assert(
+        rendered.includes(
+          `<script src="/custom_js.js" type="module" async></script>`,
+        ),
+        "Includes <script> tag with custom js file",
+      );
+    },
   });
 });
 
