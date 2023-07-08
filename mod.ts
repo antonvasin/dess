@@ -56,7 +56,7 @@ export interface PostFrontmatter extends Record<string, unknown> {
   /** Publish date */
   date?: string;
   /** Custom js path */
-  js?: string;
+  js?: string | string[];
 }
 
 export interface ContentHeading {
@@ -169,14 +169,16 @@ export async function renderHtml(
   );
   let LayoutToUse = layout;
 
-  if (frontmatter) {
-    if (frontmatter.layout) {
-      LayoutToUse = await importLayout(frontmatter.layout, layout);
-    }
+  if (frontmatter?.layout) {
+    LayoutToUse = await importLayout(frontmatter.layout, layout);
+  }
 
-    if (frontmatter.js) {
-      const jsBundle = await bundle(new URL(frontmatter.js, import.meta.url), { load });
-      console.debug("jsBundle", jsBundle.code);
+  let scripts: string[] | undefined;
+  if (frontmatter?.js) {
+    if (Array.isArray(frontmatter?.js)) {
+      scripts = frontmatter.js;
+    } else {
+      scripts = [frontmatter.js];
     }
   }
 
@@ -189,14 +191,27 @@ export async function renderHtml(
   }
 
   const rendered = renderSSR(
-    h(LayoutToUse, {
-      routes,
-      html: renderTokens(tokens),
-      frontmatter,
-      page,
-      headings,
-    }),
+    h(
+      LayoutToUse,
+      {
+        routes,
+        html: renderTokens(tokens),
+        frontmatter,
+        page,
+        headings,
+      },
+      scripts?.length
+        ? scripts.map((script) =>
+          h(Helmet, {}, [h("script", {
+            src: script,
+            type: "module",
+            async: true,
+          })])
+        )
+        : undefined,
+    ),
   );
+
   const { head, body, footer, attributes } = Helmet.SSR(rendered);
   return `<!DOCTYPE html>
   <html ${attributes.html.toString()}>

@@ -11,36 +11,54 @@ import { LayoutProps } from "./Components.tsx";
 
 const outDir = "dist";
 
-Deno.test("renderHtml", async () => {
-  const pageContent = `# page without frontmatter
+Deno.test("renderHtml", async (t) => {
+  await t.step("frontmatter", async () => {
+    const pageContent = `# page without frontmatter
 
   hello world!`;
 
-  const html = await renderHtml("/page", pageContent);
+    const html = await renderHtml("/page", pageContent);
 
-  assert(
-    html.includes(
-      `<h1 id="page-without-frontmatter"><a class='anchor' href="/page.html#page-without-frontmatter">`,
-    ),
-    "Should include heading with id and self-referencing link",
-  );
+    assert(
+      html.includes(
+        `<h1 id="page-without-frontmatter"><a class='anchor' href="/page.html#page-without-frontmatter">`,
+      ),
+      "Should include heading with id and self-referencing link",
+    );
 
-  const MyLayout = (props: LayoutProps) => (
-    <html>
-      <body>
-        <h1>My Custom Layout</h1>
-        <main innerHTML={{ __dangerousHtml: props.html }} />
-      </body>
-    </html>
-  );
+    const MyLayout = (props: LayoutProps) => (
+      <html>
+        <body>
+          <h1>My Custom Layout</h1>
+          <main innerHTML={{ __dangerousHtml: props.html }} />
+        </body>
+      </html>
+    );
 
-  const htmlCustomLayout = await renderHtml("/page", pageContent, { layout: MyLayout });
+    const htmlCustomLayout = await renderHtml("/page", pageContent, { layout: MyLayout });
 
-  assert(
-    htmlCustomLayout.includes("<h1>My Custom Layout</h1"),
-    "Should include header from custom layout",
-  );
-  assert(htmlCustomLayout.includes("hello world!"), "Should include content");
+    assert(
+      htmlCustomLayout.includes("<h1>My Custom Layout</h1"),
+      "Should include header from custom layout",
+    );
+    assert(htmlCustomLayout.includes("hello world!"), "Should include content");
+  });
+
+  await t.step("js imports", async () => {
+    const content = `---
+js: './custom_js.ts
+---
+# Page title
+`;
+
+    const rendered = await renderHtml("/index", content);
+    assert(
+      rendered.includes(
+        `<script src="/custom_js.js" type="module" async></script>`,
+      ),
+      "Includes <script> tag with custom js file",
+    );
+  });
 });
 
 Deno.test(
