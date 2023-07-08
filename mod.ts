@@ -1,9 +1,10 @@
 import { parse } from "https://deno.land/std@0.192.0/flags/mod.ts";
-import { emptyDir, ensureDir, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
+import { emptyDir, ensureDir, exists, walk } from "https://deno.land/std@0.192.0/fs/mod.ts";
 import {
   basename,
   dirname,
   join,
+  normalize,
   relative,
   resolve,
 } from "https://deno.land/std@0.192.0/path/mod.ts";
@@ -13,12 +14,12 @@ import {
   Token,
   tokens,
 } from "https://deno.land/x/rusty_markdown@v0.4.1/mod.ts";
+import { bundle } from "https://deno.land/x/emit@0.24.0/mod.ts";
 import { slug } from "https://deno.land/x/slug@v1.1.0/mod.ts";
 import { h, Helmet, renderSSR } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import { insertAt } from "../orchard/string.ts";
 import { formatDuration } from "../orchard/time.ts";
 import { blue, bold, combineStyle, green, red, reset } from "../orchard/console.ts";
-import { exists } from "https://deno.land/std@0.192.0/fs/exists.ts";
 import { serveDir } from "https://deno.land/std@0.192.0/http/file_server.ts";
 import { serve as _serve, ServeInit } from "https://deno.land/std@0.192.0/http/server.ts";
 import { DefaultLayout, LayoutComponent, NotFound } from "./Components.tsx";
@@ -140,7 +141,11 @@ interface RenderOpts {
   routes?: string[];
 }
 
-export async function importLayout(path: string, fallback?: LayoutComponent) {
+export async function importLayout(path: string | undefined, fallback?: LayoutComponent) {
+  if (!path) {
+    return fallback;
+  }
+
   try {
     return (await import(path)).default || fallback;
   } catch (err) {
@@ -157,7 +162,7 @@ export async function renderHtml(
   page: string,
   content: string,
   opts: RenderOpts = {},
-): Promise<string> {
+): Promise<{ html: string; assets?: string[] }> {
   const { layout = DefaultLayout, routes = [] } = opts;
   let input = content;
   let frontmatter: PostFrontmatter = {};
@@ -172,24 +177,20 @@ export async function renderHtml(
     input,
     routes,
   );
-  let LayoutToUse = layout;
-
-  if (frontmatter?.layout) {
-    LayoutToUse = await importLayout(frontmatter.layout, layout);
-  }
+  const Layout = await importLayout(frontmatter?.layout, layout);
 
   let scripts: string[] | undefined;
   if (frontmatter?.js) {
     if (Array.isArray(frontmatter?.js)) {
-      scripts = frontmatter.js;
+      scripts = frontmatter.js.map(normalize);
     } else {
-      scripts = [frontmatter.js];
+      scripts = [normalize(frontmatter.js)];
     }
   }
 
-  if (LayoutToUse !== DefaultLayout && isDebug) {
+  if (Layout !== DefaultLayout && isDebug) {
     console.debug(
-      `Using layout %c${LayoutToUse.name}%c for ${page}`,
+      `Using layout %c${Layout.name}%c for ${page}`,
       combineStyle(bold, blue),
       reset,
     );
@@ -197,7 +198,7 @@ export async function renderHtml(
 
   const rendered = renderSSR(
     h(
-      LayoutToUse,
+      Layout,
       {
         routes,
         html: renderTokens(tokens),
@@ -208,9 +209,9 @@ export async function renderHtml(
       scripts?.length
         ? scripts.map((script) =>
           h(Helmet, {}, [h("script", {
-            src: script,
+            src: script.replace(/\.ts(x?)$/i, ".js"),
             type: "module",
-            async: true,
+            async: "",
           })])
         )
         : undefined,
@@ -218,7 +219,7 @@ export async function renderHtml(
   );
 
   const { head, body, footer, attributes } = Helmet.SSR(rendered);
-  return `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
   <html ${attributes.html.toString()}>
     <head>
       <meta charset="UTF-8">
@@ -230,6 +231,7 @@ export async function renderHtml(
     ${footer.join("\n")}
   </body>
 </html>`;
+  return { html, assets: scripts };
 }
 
 export async function writePage(
@@ -246,10 +248,23 @@ export async function writePage(
     const content = await Deno.readTextFile(path);
     const opts: RenderOpts = { routes, layout };
 
-    const html = await renderHtml(page, content, opts);
+    const { html, assets = [] } = await renderHtml(page, content, opts);
 
     const out = `${outDir}${dirname(page)}`;
     await ensureDir(out);
+
+    for (const asset of assets) {
+      const js = await bundle(
+        resolve(join(srcDir, asset)),
+        { compilerOptions: { sourceMap: false, checkJs: true } },
+      );
+      const filename = join(outDir, asset).replace(/.ts(x?)$/, ".js");
+      console.info(`Writing %c${filename}…`, green);
+      await Deno.writeTextFile(
+        filename,
+        js.code,
+      );
+    }
 
     Deno.writeTextFile(`${outDir}${addExt(page)}`, html);
   } catch (err) {

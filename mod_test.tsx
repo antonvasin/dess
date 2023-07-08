@@ -17,7 +17,7 @@ Deno.test("renderHtml", async (t) => {
 
   hello world!`;
 
-    const html = await renderHtml("/page", pageContent);
+    const { html } = await renderHtml("/page", pageContent);
 
     assert(
       html.includes(
@@ -35,7 +35,7 @@ Deno.test("renderHtml", async (t) => {
       </html>
     );
 
-    const htmlCustomLayout = await renderHtml("/page", pageContent, { layout: MyLayout });
+    const { html: htmlCustomLayout } = await renderHtml("/page", pageContent, { layout: MyLayout });
 
     assert(
       htmlCustomLayout.includes("<h1>My Custom Layout</h1"),
@@ -46,18 +46,19 @@ Deno.test("renderHtml", async (t) => {
 
   await t.step({
     name: "js imports",
-    ignore: true,
+    // ignore: true,
     async fn() {
       const content = `---
-js: './custom_js.ts
+js: './custom_js.ts'
 ---
+
 # Page title
 `;
 
-      const rendered = await renderHtml("/index", content);
+      const { html } = await renderHtml("/index", content);
       assert(
-        rendered.includes(
-          `<script src="/custom_js.js" type="module" async></script>`,
+        html.includes(
+          `<script src="custom_js.js" type="module" async=""></script>`,
         ),
         "Includes <script> tag with custom js file",
       );
@@ -77,11 +78,14 @@ Deno.test(
           "--allow-read",
           "--allow-write",
           "--allow-sys",
+          "--allow-env",
+          "--allow-net",
           "mod.ts",
           "build",
           "--srcDir=test",
           `--outDir=${outDir}`,
         ],
+        stderr: "inherit",
       });
 
       const { code, stdout } = await cmd.output();
@@ -91,6 +95,10 @@ Deno.test(
       assertMatch(decoder.decode(stdout), /^Done in \d+ms!$/m);
       assert(await exists(`${outDir}/hello.html`, { isFile: true }));
       assert(await exists(`${outDir}/blog`, { isDirectory: true }));
+      // assert(
+      //   await exists(`${outDir}/blog/custom.js`, { isFile: true }),
+      //   "Custom JS module doesn't exist",
+      // );
     });
   },
 );
