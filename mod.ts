@@ -107,7 +107,7 @@ export function processMd(
       );
       const headerContent = renderTokens(parsed.slice(i + 1, tagEndIdx + i));
 
-      const headerAnchorLink = `<a class='anchor' href="${addExt(page)}#${slugText}">link</a>`;
+      const headerAnchorLink = `<a class='anchor' href="${addExt(page)}#${slugText}">§</a>`;
 
       const htmlHeader: Token = {
         type: "html",
@@ -135,7 +135,7 @@ interface RenderOpts {
   routes?: string[];
 }
 
-export async function importLayout(path: string, fallback?: (props: any) => any) {
+export async function importLayout(path: string, fallback?: LayoutComponent) {
   try {
     return (await import(path)).default || fallback;
   } catch (err) {
