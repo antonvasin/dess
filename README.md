@@ -6,14 +6,17 @@ Creates static website from directory of markdown files.
 
 ## Use
 
-Assuming we have folder with `.md` files, we can build static website and save it to `dist`
-directory:
-
 ```sh
-deno run --allow-read --allow-write https://deno.land/x/dess/mod.ts --srcDir=./ --outDir=./dist --layout=./Layout.tsx
+deno run --allow-read --allow-write https://deno.land/x/dess/mod.ts --srcDir=./pages --layout=./Layout.tsx
 ```
 
-Or we can do it programmatically:
+| Arg        | Description                                         |
+| ---------- | --------------------------------------------------- |
+| `--srcDir` | Path to folder with markdown files _(default: `.`)_ |
+| `--outDir` | Output folder _(default: `dist`)_                   |
+| `--layout` | Path to `.jsx` or `.tsx` layout file                |
+
+Or programmatically:
 
 ```ts
 import { build } from "https://deno.land/x/dess/mod.ts";
