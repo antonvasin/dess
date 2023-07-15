@@ -118,10 +118,10 @@ Deno.test(
       assertMatch(decoder.decode(stdout), /^Done in \d+ms!$/m);
       assert(await exists(`${outDir}/hello.html`, { isFile: true }));
       assert(await exists(`${outDir}/blog`, { isDirectory: true }));
-      // assert(
-      //   await exists(`${outDir}/blog/custom.js`, { isFile: true }),
-      //   "Custom JS module doesn't exist",
-      // );
+      assert(
+        await exists(`${outDir}/blog/custom.js`, { isFile: true }),
+        "Custom JS module doesn't exist",
+      );
     });
   },
 );
