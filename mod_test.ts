@@ -1,16 +1,44 @@
-import { h } from "https://deno.land/x/nano_jsx@v0.0.37/mod.ts";
 import {
   assert,
   assertEquals,
   assertMatch,
 } from "https://deno.land/std@0.192.0/testing/asserts.ts";
-import { emptyDir, exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
+import { emptyDir, ensureDir, exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
+import { dirname, join } from "https://deno.land/std@0.192.0/path/mod.ts";
 
 import { renderHtml } from "./mod.ts";
-import { LayoutProps } from "./Components.tsx";
 import TestLayout from "./test/test_layout.tsx";
+import { random } from "../orchard/number.ts";
 
-const outDir = "dist";
+const outDir = "./__test_output";
+
+function pageTemplate(title: string, paths: string[], linkPerPage: number) {
+  let page = `# ${title}\n\n`;
+  const links = [];
+  for (let i = 0; i < linkPerPage; i++) {
+    links.push(`- [[${paths[random(0, paths.length)]}]]`);
+  }
+  page += links.join("\n");
+  return page;
+}
+
+function generatePaths(pagesCount: number) {
+  const paths = [];
+  for (let i = 0; i < pagesCount; i++) {
+    paths.push(`folder_${random(1, 4)}/Note_${i}`);
+  }
+  return paths;
+}
+
+async function generateTestPages(pagesCount = 1000, linksPerPage = 10) {
+  const pages = generatePaths(pagesCount);
+  await emptyDir(outDir);
+  for (const path of pages) {
+    await ensureDir(join(outDir, dirname(path)));
+
+    Deno.writeTextFile(join(outDir, path) + ".md", pageTemplate(path, pages, linksPerPage));
+  }
+}
 
 Deno.test("renderHtml", async (t) => {
   await t.step("render", async () => {
@@ -62,6 +90,7 @@ js: './custom_js.ts'
 
 Deno.test(
   "E2E",
+  { ignore: !Deno.args.includes("e2e") },
   async (t) => {
     await t.step("build", async () => {
       await emptyDir(outDir);
