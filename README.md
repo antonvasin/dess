@@ -41,9 +41,11 @@ await build({
   - [x] get html
   - [x] replace links
     - [x] prepend with absolute path
-    - [ ] handle .md links
+    - [ ] handle wiki links
+    - [ ] resolve links in folders (`Note` matches `folder/Note`)
     - [x] handle nested links
     - [x] preserve query strings and headers
+  - [ ] collect backlinks
   - [x] create url-safe anchors for headers
   - [x] return list of headers for a page
   - [x] return meta from frontmatter
