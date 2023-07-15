@@ -8,6 +8,7 @@ import { emptyDir, exists } from "https://deno.land/std@0.192.0/fs/mod.ts";
 
 import { renderHtml } from "./mod.ts";
 import { LayoutProps } from "./Components.tsx";
+import TestLayout from "./test/test_layout.tsx";
 
 const outDir = "dist";
 
@@ -26,19 +27,12 @@ Deno.test("renderHtml", async (t) => {
       "Should include heading with id and self-referencing link",
     );
 
-    const MyLayout = (props: LayoutProps) => (
-      <html>
-        <body>
-          <h1>My Custom Layout</h1>
-          <main innerHTML={{ __dangerousHtml: props.html }} />
-        </body>
-      </html>
-    );
-
-    const { html: htmlCustomLayout } = await renderHtml("/page", pageContent, { layout: MyLayout });
+    const { html: htmlCustomLayout } = await renderHtml("/page", pageContent, {
+      layout: TestLayout,
+    });
 
     assert(
-      htmlCustomLayout.includes("<h1>My Custom Layout</h1"),
+      htmlCustomLayout.includes("<h1>This is a test layout</h1"),
       "Should include header from custom layout",
     );
     assert(htmlCustomLayout.includes("hello world!"), "Should include content");
