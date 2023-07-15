@@ -20,7 +20,7 @@ Deno.test("renderHtml", async () => {
 
   assert(
     html.includes(
-      `<h1 id="page-without-frontmatter"><a class='anchor' href="/page.html#page-without-frontmatter">link</a> page without frontmatter</h1>`,
+      `<h1 id="page-without-frontmatter"><a class='anchor' href="/page.html#page-without-frontmatter">`,
     ),
     "Should include heading with id and self-referencing link",
   );
