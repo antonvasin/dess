@@ -2,7 +2,10 @@
 
 dess = _deno_ + _press_
 
-Creates static website from directory of markdown files.
+Creates static website from directory of markdown files with JSX templates.
+
+It supports Obsidian note format and is similar to [qartz](https://quartz.jzhao.xyz) or self-host
+Obsidian Publish alternatives but it is not exclusively for use with Obsidian.
 
 ## Use
 
@@ -32,8 +35,6 @@ await build({
 ## TODO
 
 - [x] Collect md files
-  - [ ] collect html files
-  - [ ] collect custom 404 page
   - [ ] skip draft pages
 - [ ] Process md files
   - [x] parse markdown
@@ -41,25 +42,30 @@ await build({
   - [x] get html
   - [x] replace links
     - [x] prepend with absolute path
-    - [ ] handle wiki links
-    - [ ] resolve links in folders (`Note` matches `folder/Note`)
+    - [ ] handle Obsidian/wiki links
+      - [ ] resolve ambiguous links (`Note` matches `folder/Note`)
     - [x] handle nested links
     - [x] preserve query strings and headers
-  - [ ] collect backlinks
+  - [ ] collect backlinks and pass to template
   - [x] create url-safe anchors for headers
   - [x] return list of headers for a page
   - [x] return meta from frontmatter
-- [ ] Render static files
+- [x] Render static files
   - [x] apply layout
     - [x] read jsx file from frontmatter
     - [x] render html
     - [x] insert content into html
-  - [ ] add asset scripts
-    - [ ] read files from frontmatter
-    - [ ] add <script> to page
-    - [ ] copy asset to /dist
-  - [x] render final html to file
-- [x] Copy to dist/ folder
+    - [x] create html files
+  - [x] add asset scripts
+    - [x] read files from frontmatter
+    - [x] add <script>s to page
+    - [x] bundle asset to /dist
 - [x] copy public files
+- [ ] support HTML pages -> copy as is to dist
 - [x] HMR
-- [ ] RSS
+- [ ] Generate RSS file
+- [ ] Generate sitemap
+- [ ] microserver
+  - [ ] support extensionless routes
+  - [x] respond with custom 404 page
+  - [ ] can pass your own 404
