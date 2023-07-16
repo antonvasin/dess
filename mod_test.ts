@@ -11,13 +11,21 @@ import TestLayout from "./test/test_layout.tsx";
 import { random } from "../orchard/number.ts";
 
 const outDir = "./__test_output";
+const fixturesDir = "./__test_input";
 
 function pageTemplate(title: string, paths: string[], linkPerPage: number) {
-  let page = `# ${title}\n\n`;
+  let page = `---
+title: ${title}
+publish: true
+---
+
+# ${title}
+`;
   const links = [];
   for (let i = 0; i < linkPerPage; i++) {
     links.push(`- [[${paths[random(0, paths.length)]}]]`);
   }
+  page += "\n";
   page += links.join("\n");
   return page;
 }
@@ -32,11 +40,11 @@ function generatePaths(pagesCount: number) {
 
 async function generateTestPages(pagesCount = 1000, linksPerPage = 10) {
   const pages = generatePaths(pagesCount);
-  await emptyDir(outDir);
+  await emptyDir(fixturesDir);
   for (const path of pages) {
-    await ensureDir(join(outDir, dirname(path)));
+    await ensureDir(join(fixturesDir, dirname(path)));
 
-    Deno.writeTextFile(join(outDir, path) + ".md", pageTemplate(path, pages, linksPerPage));
+    Deno.writeTextFile(join(fixturesDir, path) + ".md", pageTemplate(path, pages, linksPerPage));
   }
 }
 
@@ -122,6 +130,32 @@ Deno.test(
         await exists(`${outDir}/blog/custom.js`, { isFile: true }),
         "Custom JS module doesn't exist",
       );
+    });
+
+    await t.step("stress test", async () => {
+      await emptyDir(outDir);
+      await generateTestPages(1000, 10);
+      assert(await exists(`${fixturesDir}/folder_1`, { isDirectory: true }));
+
+      const cmd = new Deno.Command(Deno.execPath(), {
+        args: [
+          "run",
+          "--allow-read",
+          "--allow-write",
+          "--allow-sys",
+          "--allow-env",
+          "--allow-net",
+          "mod.ts",
+          "build",
+          `--srcDir=${fixturesDir}`,
+          `--outDir=${outDir}`,
+          `--layout=test/test_layout.tsx`,
+        ],
+        stderr: "inherit",
+      });
+
+      await cmd.output();
+      assert(await exists(`${outDir}/folder_1`, { isDirectory: true }));
     });
   },
 );
