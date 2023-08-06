@@ -1,3 +1,5 @@
+/// <reference lib="dom" />
+/// <reference lib="dom.iterable" />
 import {
   assert,
   assertEquals,
@@ -19,8 +21,8 @@ title: ${title}
 publish: true
 ---
 
-# ${title}
-`;
+# ${title}`;
+
   const links = [];
   for (let i = 0; i < linkPerPage; i++) {
     links.push(`- [[${paths[random(0, paths.length)]}]]`);
@@ -90,9 +92,25 @@ js: './custom_js.ts'
         html.includes(
           `<script src="custom_js.js" type="module" async=""></script>`,
         ),
-        "Includes <script> tag with custom js file",
+        "Should include <script> tag with custom js file",
       );
     },
+  });
+
+  await t.step("inject islands", async () => {
+    const page = `---
+title: Page with island
+---
+## Update {#island-header}
+\`\`\`typescript
+console.log('hello');
+document.querySelector('#island-header')?.innerHTML('Island!');
+\`\`\`
+`;
+
+    const { html } = await renderHtml("/index", page);
+
+    assert(html.includes(`<dess-island>`), "Should inlcude custom <dess-island> element");
   });
 });
 

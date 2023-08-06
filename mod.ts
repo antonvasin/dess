@@ -63,16 +63,13 @@ export interface ContentHeading {
   text: string;
 }
 
-export interface ContentEntry {
-  tokens: Token[];
-  headings?: ContentHeading[];
-}
+const islandLanguages = ["javascript", "typescript"] as const;
 
 export function processMd(
-  page: string,
+  pageName: string,
   markdown: string,
   routes: string[],
-): ContentEntry {
+) {
   const parsed = tokens(markdown, {
     footnotes: true,
     tasklists: true,
@@ -80,9 +77,11 @@ export function processMd(
     tables: true,
   });
   const headings: ContentHeading[] = [];
+  const scripts: string[] = [];
+  let bootstrapInjected = false;
 
   if (isDebug) {
-    console.log(`Tokens for %c${page} %cbefore rewrite:`, bold, reset);
+    console.log(`Tokens for %c${pageName} %cbefore rewrite:`, bold, reset);
     console.dir(parsed);
   }
 
@@ -112,9 +111,10 @@ export function processMd(
       const tagEndIdx = parsed.slice(i).findIndex((token) =>
         token.type === "end" && token.tag === "heading"
       );
-      const headerContent = renderTokens(parsed.slice(i + 1, tagEndIdx + i));
 
-      const headerAnchorLink = `<a class='anchor' href="${addExt(page)}#${slugText}">§</a>`;
+      const headerContent = renderTokens(parsed.slice(i + 1, i + tagEndIdx));
+
+      const headerAnchorLink = `<a class='anchor' href="${addExt(pageName)}#${slugText}">§</a>`;
 
       const htmlHeader: Token = {
         type: "html",
@@ -122,9 +122,40 @@ export function processMd(
           `<h${token.level} id="${slugText}">${headerAnchorLink} ${headerContent}</h${token.level}>`,
       };
 
-      ary.splice(i, tagEndIdx + 1, htmlHeader);
-
       headings.push({ text: headingText, slug: slugText });
+
+      ary.splice(i, tagEndIdx + 1, htmlHeader);
+    }
+
+    // Inject Islands
+    if (
+      token.type === "start" && token.tag === "codeBlock" && token.type &&
+      islandLanguages.includes((token as any).language)
+    ) {
+      const next = parsed[i + 1];
+      if (next.type !== "text") {
+        throw new Error(`Invalid code block content: ${JSON.stringify(next)}`);
+      }
+      const { content: codeContent } = next;
+
+      const htmlIsland: Token = {
+        type: "html",
+        content: `<dess-island>
+  <template>
+    <script type="module">
+      ${codeContent}
+    </script>
+  </template>
+</dess-island>`,
+      };
+
+      if (!bootstrapInjected) {
+        scripts.push("island.js");
+        bootstrapInjected = true;
+      }
+
+      // We assume that there's only one element between 'start' and 'end'
+      parsed.splice(i, i + 2, htmlIsland);
     }
   });
 
@@ -133,7 +164,7 @@ export function processMd(
     console.dir(parsed);
     console.dir(headings);
   }
-  return { tokens: parsed, headings };
+  return { tokens: parsed, headings, scripts };
 }
 
 interface RenderOpts {
@@ -172,14 +203,14 @@ export async function renderHtml(
     frontmatter = attrs;
   }
 
-  const { tokens, headings } = processMd(
+  const { tokens, headings, scripts: islandsScripts } = processMd(
     page,
     input,
     routes,
   );
   const Layout = await importLayout(frontmatter?.layout, layout);
 
-  let scripts: string[] | undefined;
+  let scripts: string[] = islandsScripts || [];
   if (frontmatter?.js) {
     if (Array.isArray(frontmatter?.js)) {
       scripts = frontmatter.js.map(normalize);
