@@ -4,8 +4,16 @@ dess = _deno_ + _press_
 
 Creates static website from directory of markdown files with JSX templates.
 
-It supports Obsidian note format and is similar to [qartz](https://quartz.jzhao.xyz) or self-host
-Obsidian Publish alternatives but it is not exclusively for use with Obsidian.
+It supports Obsidian note format and is like leaner and meaner cousin of
+[qartz](https://quartz.jzhao.xyz).
+
+## Design
+
+- Base entity is a markdown page
+- Page can have it's own layout, scripts and styles
+- Functionality should be extended programmatically, instead of using plugin system
+- Obsidian markdown note is supported
+- Written to be as fast as possible with minimal amount of code and dependencies
 
 ## Use
 
